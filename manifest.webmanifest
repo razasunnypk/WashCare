@@ -1,0 +1,14 @@
+{
+  "name": "WashCare Laundry Services",
+  "short_name": "WashCare",
+  "description": "Offline-first laundry business management PWA.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f6f8f8",
+  "theme_color": "#0f766e",
+  "lang": "en",
+  "dir": "ltr",
+  "icons": [
+    {"src":"assets/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}
