@@ -8,6 +8,8 @@ A single-page laundry management app for Washcare Laundry Services, Dubai. Runs 
 - **80mm receipt printing** — three copies per order in one print job: **Office**, **Customer**, and **Factory** (the factory copy shows quantities and items only, never rates or totals).
 - **VAT handling** — rates are VAT-inclusive, matching the current printed bill. The receipt shows Amount Incl. VAT, Amount Before VAT and VAT 5% exactly as before.
 - **Payments and dues** — record part payments later, and every receipt shows the customer's previous outstanding plus the current balance.
+- **Send on WhatsApp** — one tap after saving an order opens WhatsApp with the customer's number and the full invoice already written out: items, quantities, totals, VAT, and the balance due. Also available on any past order from the Orders list. A **Copy message** button is there for when you want to paste it somewhere else.
+- **Contract rates remembered per customer** — when you charge a customer a rate that differs from the price list, the app remembers it. Next time you enter their number and pick that item, their agreed rate fills in automatically with a note showing the list rate and when it was last charged, plus a **Use list rate** button to override. Each customer's agreed rates are listed in their profile.
 - **Customers** — automatic customer index built from orders: order count, total billed, pending amount, full order history.
 - **Reports** — month-by-month sales, collected vs pending, VAT total, discounts, urgent charges, daily sales chart, item-wise sales, and a printable 80mm day/month report slip.
 - **Price list** — your full 176-item WashCare price list is built in, by category, with Dry clean / Wash & iron / Ironing rates. Rates auto-fill during order entry, and every rate is editable in the app.
@@ -21,6 +23,8 @@ A single-page laundry management app for Washcare Laundry Services, Dubai. Runs 
 | `index.html` | The entire application |
 | `manifest.json` | Home-screen install settings |
 | `sw.js` | Offline support (network-first, so it never serves a stale version while online) |
+| `config.js` | Supabase details for multi-device sync (optional) |
+| `supabase-setup.sql` | Run once in Supabase to create the tables |
 | `icon.png`, `icon.svg` | App icons |
 
 ## Deploy on GitHub Pages
@@ -41,6 +45,12 @@ Keep the repository **private** if you prefer — GitHub Pages on a private repo
 4. Open **Price list** and check the rates. They come from `Washcare-Price_list.xlsx` exactly as supplied.
 5. Take a backup from **Settings → Download backup**.
 
+### WhatsApp
+
+Numbers are converted to international format automatically, so `0501234567`, `+971 50 123 4567` and `00971501234567` all work. The country code (default `971`) is in **Settings → WhatsApp**, along with a switch to hide rates from the message and the closing line. For a customer outside the UAE, type the number with its own country code.
+
+WhatsApp's link format carries text only, not files, so the message is the invoice written out in plain text rather than an image of the 80mm slip. On a phone it opens the WhatsApp app; on a desktop it opens WhatsApp Web.
+
 ### Fast service
 
 Every item in the supplied price list charges exactly double for fast service. The app handles this with the **Fast service** switch on the order form, which adds 100% as an urgent charge — the same way it appears on your current printed bills. Change the percentage in **Settings** if that ever stops being true.
@@ -52,13 +62,40 @@ Every item in the supplied price list charges exactly double for fast service. T
 - Turn on **Background graphics** so the copy label boxes print.
 - Choose which copies print by default in **Settings → Which copies to print**.
 
+## Multi-device sync (optional)
+
+Out of the box the app is single-device. To run it on the counter tablet, the owner's phone and the delivery van at the same time:
+
+1. Create a free project at supabase.com.
+2. Open **SQL Editor**, paste all of `supabase-setup.sql`, and run it. This creates the tables and — importantly — locks them down so only signed-in staff can read anything.
+3. In **Project Settings → API**, copy the **Project URL** and the **anon / public** key. Never use the `service_role` key here; it bypasses all security.
+4. Paste both into `config.js` and commit the file.
+5. In **Authentication → Users**, add one account per staff member (email + password). There is no public sign-up.
+6. On each device: open the app, sign in, then go to **Settings → Device and sync** and give it a unique **device code** — `A` for the counter, `B` for the owner's phone, and so on.
+
+Orders, the price list and the business settings then sync automatically. Changes appear on the other devices within a second or two, and a pill in the header shows the sync state.
+
+### Receipt numbering across devices
+
+Each device gets its own series: device A prints `WC-A-0004528`, device B prints `WC-B-0000112`. This is why the device code matters — without it, two devices working at the same time would eventually produce the same invoice number, which is a real problem for VAT records. Separate series per till is normal practice and stays sequential within each series.
+
+### Offline behaviour
+
+If the internet drops, the app keeps working. Orders save locally and the header shows how many are waiting. As soon as the connection returns they upload automatically. Nothing is lost, and receipts still print.
+
+### What sync does and does not cover
+
+- Synced: orders, payments, the price list, business settings, logo, terms.
+- Not synced: the next receipt number and the device code (deliberately — they belong to each device), and which copies that device prints.
+- Conflicts: if the same order is edited on two devices, the most recent edit wins. Rare in practice, but worth knowing.
+
 ## Where the data lives
 
-Records are stored in the browser's local storage on the device that created them. That means:
+Without Supabase configured, records are stored in the browser's local storage on the device that created them. That means:
 
 - Data is **not** shared between the shop tablet and your phone.
 - Clearing browser data, or "clear site data", deletes the records.
 - Use one device as the master till, and download a backup weekly into Google Drive.
 - To move to another device: **Download backup** on the old one, **Restore backup** on the new one.
 
-If you later need multiple devices sharing one live database, the app will need a hosted backend (Supabase or Firebase). The current build is deliberately serverless so it cannot break, cost money, or leak customer data.
+With Supabase configured, every device keeps its own local copy **and** pushes to the shared database, so a lost or wiped device costs you nothing. Weekly JSON backups are still worth taking.

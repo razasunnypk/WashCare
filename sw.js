@@ -1,6 +1,6 @@
 /* Network-first: always fresh when online, still opens when offline. */
 var CACHE = "washcare-v1";
-var ASSETS = ["./", "./index.html", "./manifest.json", "./icon.svg", "./icon.png"];
+var ASSETS = ["./", "./index.html", "./manifest.json", "./icon.svg", "./icon.png", "./config.js"];
 
 self.addEventListener("install", function(e){
   self.skipWaiting();

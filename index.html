@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
 <title>WashCare Laundry Manager</title>
+<script src="config.js"></script>
 <meta name="theme-color" content="#1a7bbf">
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -149,6 +150,17 @@ table.data td.n,table.data th.n{text-align:right;font-variant-numeric:tabular-nu
 .savebar .tot{flex:1;font-size:13px;color:var(--muted)}
 .savebar .tot b{display:block;font-size:18px;color:var(--ink);font-variant-numeric:tabular-nums}
 
+/* ---------- login ---------- */
+.login{position:fixed;inset:0;z-index:90;background:var(--paper);display:flex;align-items:center;justify-content:center;padding:20px}
+.login[hidden]{display:none}
+.login-box{background:var(--white);border:1px solid var(--line);border-radius:14px;padding:22px;width:100%;max-width:380px;text-align:center;box-shadow:0 8px 30px rgba(15,31,51,.10)}
+.login-box img{margin:0 auto 6px;display:block}
+.login-box h2{font-size:17px;margin-bottom:4px}
+.login-box .fld{text-align:left}
+.login-box .btn-row{justify-content:center}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}
+.pill.warnp{background:var(--warn-bg);color:var(--warn)}
+
 /* ---------- 80mm receipt ---------- */
 #printArea{display:none}
 .rcpt{width:72mm;margin:0 auto;color:#000;background:#fff;font-family:Arial,Helvetica,sans-serif;font-size:11.5px;line-height:1.32}
@@ -195,6 +207,21 @@ table.data td.n,table.data th.n{text-align:right;font-variant-numeric:tabular-nu
 </style>
 </head>
 <body>
+<div class="login" id="login" hidden>
+  <div class="login-box">
+    <img id="loginLogo" alt="" width="150">
+    <h2>Staff sign in</h2>
+    <p class="hint" id="loginHint">Sign in to sync orders with the other devices.</p>
+    <label class="fld"><span>Email</span><input type="email" id="loginEmail" autocomplete="username"></label>
+    <label class="fld" style="margin-top:8px"><span>Password</span><input type="password" id="loginPass" autocomplete="current-password"></label>
+    <div class="btn-row" style="margin-top:12px">
+      <button class="btn primary" id="loginGo">Sign in</button>
+      <button class="btn ghost" id="loginSkip">Work offline on this device</button>
+    </div>
+    <p class="hint" id="loginErr" style="color:var(--warn)"></p>
+  </div>
+</div>
+
 <header class="topbar">
   <div class="topbar-in">
     <div class="brandmark" id="hdLogo"></div>
@@ -203,6 +230,7 @@ table.data td.n,table.data th.n{text-align:right;font-variant-numeric:tabular-nu
       <span id="hdWeb">washcare.ae</span>
     </div>
     <div class="topbar-spacer"></div>
+    <div class="pill" id="hdSync" hidden>Offline</div>
     <div class="pill" id="hdStat">0 orders</div>
   </div>
 </header>
@@ -433,6 +461,33 @@ table.data td.n,table.data th.n{text-align:right;font-variant-numeric:tabular-nu
     </div>
 
     <div class="panel">
+      <div class="panel-hd"><h2>WhatsApp</h2><span class="sub">Used by the Send on WhatsApp button</span></div>
+      <div class="panel-bd">
+        <div class="grid g2 keep">
+          <label class="fld"><span>Country code</span><input type="text" id="sCC" placeholder="971"></label>
+          <label class="switch" style="align-self:end"><input type="checkbox" id="sWaPrices" checked> Include rates in the message</label>
+        </div>
+        <label class="fld" style="margin-top:10px"><span>Closing line</span><input type="text" id="sWaLine" placeholder="Free pickup and delivery across Dubai."></label>
+        <p class="hint">Local numbers like 0501234567 are converted to 971501234567 automatically.</p>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hd"><h2>Device and sync</h2><span class="sub" id="syncState">Not configured</span></div>
+      <div class="panel-bd">
+        <div class="grid g2 keep">
+          <label class="fld"><span>Device code</span><input type="text" id="sDevice" maxlength="2" placeholder="A"></label>
+          <label class="fld"><span>Signed in as</span><input type="text" id="sUser" readonly></label>
+        </div>
+        <p class="hint">Each device needs its own code (A for the counter, B for the owner's phone, and so on). Receipt numbers become WC-A-0004528, so two devices can never create the same invoice number.</p>
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn" id="btnSyncNow">Sync now</button>
+          <button class="btn danger" id="btnSignOut">Sign out</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
       <div class="panel-hd"><h2>Backup and data</h2></div>
       <div class="panel-bd">
         <div class="btn-row">
@@ -506,10 +561,14 @@ function defaultDB(){
       email:"support@washcare.ae", web:"Washcare.ae", trn:"",
       vat:5, urgentPct:100, prefix:"WC-", next:4528, pad:7,
       terms:DEFAULT_TERMS, footer:"Care for Your Clothes",
-      logo:RECEIPT_LOGO, copies:{office:true, customer:true, factory:true}
+      logo:RECEIPT_LOGO, copies:{office:true, customer:true, factory:true},
+      cc:"971", waPrices:true, waLine:"Free pickup and delivery across Dubai.",
+      deviceCode:""
     },
     items: DEFAULT_ITEMS.slice(),
-    orders: []
+    orders: [],
+    tomb: [],
+    meta: {sU:"", sDirty:false, iU:"", iDirty:false, lastPull:""}
   };
 }
 
@@ -523,10 +582,16 @@ var DB = defaultDB();
       DB.settings.copies = Object.assign({office:true,customer:true,factory:true}, (p.settings&&p.settings.copies)||{});
       if(Array.isArray(p.items) && p.items.length && p.items[0] && p.items[0].n && ("D" in p.items[0] || "W" in p.items[0] || "H" in p.items[0])) DB.items = p.items;
       if(Array.isArray(p.orders)) DB.orders = p.orders;
+      if(Array.isArray(p.tomb)) DB.tomb = p.tomb;
+      if(p.meta) DB.meta = Object.assign(DB.meta, p.meta);
     }catch(e){ /* keep defaults on a corrupt file */ }
   }
 })();
 function save(){ saveRaw(JSON.stringify(DB)); }
+function nowISO(){ return new Date().toISOString(); }
+function touch(o){ o._u = nowISO(); o._dirty = true; }
+function saveS(){ DB.meta.sU=nowISO(); DB.meta.sDirty=true; save(); cloudPush(); }
+function saveI(){ DB.meta.iU=nowISO(); DB.meta.iDirty=true; save(); cloudPush(); }
 
 /* ============================================================
    3. HELPERS
@@ -553,7 +618,15 @@ function monthName(ym){
   return names[parseInt(p[1],10)-1]+" "+p[0];
 }
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
-function receiptNo(){ var s=DB.settings; return s.prefix + String(s.next).padStart(s.pad||7,"0"); }
+function receiptNo(){
+  var s=DB.settings, dc=(s.deviceCode||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+  return s.prefix + (dc?dc+"-":"") + String(s.next).padStart(s.pad||7,"0");
+}
+function freeReceiptNo(){
+  var guard=0;
+  while(guard++ < 5000 && DB.orders.some(function(o){ return o.no===receiptNo(); })) DB.settings.next++;
+  return receiptNo();
+}
 function digits(s){ return String(s||"").replace(/\D/g,""); }
 
 var toastTimer;
@@ -629,7 +702,7 @@ function resetForm(){
 function formOrder(){
   return {
     id: draft.editingId || uid(),
-    no: draft.no || receiptNo(),
+    no: draft.no || freeReceiptNo(),
     date: $("#oDate").value || todayISO(),
     time: draft.createdTime || nowTime(),
     delivery: { date: $("#dDate").value, time: $("#dTime").value },
@@ -705,6 +778,33 @@ function buildKeymap(){
     it._label = label; KEYMAP[label.toLowerCase()] = it;
   });
 }
+function lastRate(mobile, itemName, type){
+  var key=digits(mobile); if(!key||!itemName) return null;
+  for(var i=DB.orders.length-1;i>=0;i--){
+    var o=DB.orders[i];
+    if(digits(o.cust.mobile)!==key) continue;
+    for(var j=o.lines.length-1;j>=0;j--){
+      var l=o.lines[j];
+      if(l.name===itemName && l.type===type) return {rate:Number(l.rate)||0, date:o.date, no:o.no};
+    }
+  }
+  return null;
+}
+function specialRates(mobile){
+  var key=digits(mobile), out={}, list=[];
+  if(!key) return list;
+  DB.orders.forEach(function(o){
+    if(digits(o.cust.mobile)!==key) return;
+    o.lines.forEach(function(l){
+      var it=DB.items.filter(function(x){ return x.n===l.name; })[0];
+      var listed = it && typeof it[l.type]==="number" ? it[l.type] : null;
+      if(listed===null) return;
+      if(Math.abs(listed-(Number(l.rate)||0))>0.009) out[l.name+"|"+l.type]={name:l.name,type:l.type,rate:Number(l.rate)||0,listed:listed,date:o.date};
+    });
+  });
+  Object.keys(out).forEach(function(k){ list.push(out[k]); });
+  return list;
+}
 function currentItem(){ return KEYMAP[$("#iName").value.trim().toLowerCase()] || null; }
 function serviceOptions(it){
   var sel=$("#iType"), keep=sel.value, avail=[];
@@ -715,19 +815,31 @@ function serviceOptions(it){
   }).join("");
   sel.value = avail.indexOf(keep)>-1 ? keep : avail[0];
 }
-function syncRate(){
+function syncRate(useList){
   var it=currentItem(); if(!it) return;
   var t=$("#iType").value;
-  $("#iRate").value = typeof it[t]==="number" ? it[t] : 0;
-  $("#itemHint").textContent = it.n+" · "+it.c+" · "+TYPE_ORDER.filter(function(x){ return typeof it[x]==="number"; })
+  var listRate = typeof it[t]==="number" ? it[t] : 0;
+  var hist = useList ? null : lastRate($("#cMobile").value, it.n, t);
+  var listLine = it.n+" · "+it.c+" · "+TYPE_ORDER.filter(function(x){ return typeof it[x]==="number"; })
     .map(function(x){ return TYPE_LABEL[x].toLowerCase()+" "+money(it[x]); }).join("  ·  ");
+  if(hist && Math.abs(hist.rate-listRate)>0.009){
+    $("#iRate").value = hist.rate;
+    $("#itemHint").innerHTML = '<b>Agreed rate for this customer: AED '+money(hist.rate)+'</b> '+
+      '(list '+money(listRate)+', last charged '+dmy(hist.date)+' on '+esc(hist.no)+') '+
+      '<button class="btn sm" id="btnUseList" type="button">Use list rate</button>';
+    var b=$("#btnUseList");
+    if(b) b.addEventListener("click", function(){ syncRate(true); });
+  }else{
+    $("#iRate").value = listRate;
+    $("#itemHint").textContent = listLine;
+  }
 }
 $("#iName").addEventListener("input", function(){
   var it=currentItem();
   if(it){ serviceOptions(it); syncRate(); }
   else{ $("#itemHint").textContent = $("#iName").value.trim() ? "Not in the price list — set the rate by hand." : ""; }
 });
-$("#iType").addEventListener("change", syncRate);
+$("#iType").addEventListener("change", function(){ syncRate(); });
 ["oUrgent","oDiscount","oAdvance"].forEach(function(id){ $("#"+id).addEventListener("input", renderTotals); });
 $("#cMobile").addEventListener("change", function(){
   var key=digits($("#cMobile").value); if(!key) return;
@@ -739,7 +851,10 @@ $("#cMobile").addEventListener("change", function(){
   if(!$("#cBuilding").value) $("#cBuilding").value = last.cust.building;
   if(!$("#cFlat").value) $("#cFlat").value = last.cust.flat;
   var due = prevDue(key, draft.editingId);
-  $("#custHint").textContent = hits.length+" previous order(s)" + (due>0.009 ? " · outstanding AED "+money(due) : " · nothing pending");
+  var sp = specialRates(key);
+  if($("#iName").value.trim()) syncRate();
+  $("#custHint").textContent = hits.length+" previous order(s)" + (due>0.009 ? " · outstanding AED "+money(due) : " · nothing pending")
+    + (sp.length ? " · "+sp.length+" agreed rate(s) on file" : "");
   renderTotals();
 });
 $("#btnResetOrder").addEventListener("click", function(){ resetForm(); toast("Form cleared"); });
@@ -748,6 +863,7 @@ function saveOrder(){
   var o = formOrder();
   if(!o.cust.name){ toast("Customer name is required"); $("#cName").focus(); return null; }
   if(!o.lines.length){ toast("Add at least one item"); $("#iName").focus(); return null; }
+  touch(o);
   if(draft.editingId){
     var i = DB.orders.findIndex(function(x){ return x.id===draft.editingId; });
     if(i>-1) DB.orders[i]=o; else DB.orders.push(o);
@@ -755,16 +871,17 @@ function saveOrder(){
     DB.orders.push(o);
     DB.settings.next = Number(DB.settings.next)+1;
   }
-  save(); refreshChrome();
+  save(); cloudPush(); refreshChrome();
   return o;
 }
 $("#btnSaveOnly").addEventListener("click", function(){
   var o=saveOrder(); if(!o) return;
-  toast("Order "+o.no+" saved"); resetForm();
+  resetForm(); savedModal(o);
 });
 $("#btnSavePrint").addEventListener("click", function(){
   var o=saveOrder(); if(!o) return;
   printOrder(o); resetForm();
+  setTimeout(function(){ savedModal(o); }, 900);
 });
 
 function editOrder(id){
@@ -881,6 +998,95 @@ function printOrder(o, only){
   setTimeout(function(){ window.print(); }, 120);
 }
 
+
+/* ============================================================
+   7b. WHATSAPP
+   ============================================================ */
+function waNumber(mobile){
+  var d = digits(mobile);
+  var cc = digits(DB.settings.cc) || "971";
+  if(!d) return "";
+  if(d.indexOf("00")===0) d = d.slice(2);
+  if(d.indexOf(cc)===0 && d.length > cc.length) return d;
+  if(d.charAt(0)==="0") d = d.slice(1);
+  if(d.length > 11) return d;
+  return cc + d;
+}
+function waText(o){
+  var s=DB.settings, c=calc(o), showRates = s.waPrices !== false;
+  var due = prevDue(o.cust.mobile, o.id);
+  var L=[];
+  L.push("*"+s.name+"*");
+  L.push("Tax invoice "+o.no);
+  L.push("");
+  if(o.cust.name) L.push("Customer: "+o.cust.name);
+  L.push("Booked: "+dmy(o.date));
+  L.push("Delivery: "+dmy(o.delivery.date)+(o.delivery.time?", "+hhmm12(o.delivery.time):""));
+  if(o.cust.area) L.push("Address: "+[o.cust.area,o.cust.building,o.cust.flat].filter(Boolean).join(", "));
+  L.push("");
+  L.push("*Items ("+c.qty+" pcs)*");
+  o.lines.forEach(function(l){
+    var label = l.qty+" x "+l.name+" - "+(TYPE_LABEL[l.type]||l.type).toLowerCase();
+    L.push(showRates ? label+": AED "+money(l.qty*l.rate) : label);
+  });
+  if(showRates){
+    L.push("");
+    L.push("Total: AED "+money(c.sub));
+    if(c.urgent>0) L.push("Fast service: AED "+money(c.urgent));
+    if(c.disc>0) L.push("Discount: AED "+money(c.disc));
+    L.push("Amount incl. VAT "+c.vatRate+"%: AED "+money(c.incl));
+    if(c.paid>0) L.push("Paid: AED "+money(c.paid));
+    if(due>0.009){
+      L.push("Previous dues: AED "+money(due));
+      L.push("*Balance due: AED "+money(due+c.balance)+"*");
+    }else{
+      L.push("*Balance due: AED "+money(c.balance)+"*");
+    }
+  }
+  if(o.notes) { L.push(""); L.push("Note: "+o.notes); }
+  L.push("");
+  if(s.waLine) L.push(s.waLine);
+  L.push([s.mobile, s.web].filter(Boolean).join(" | "));
+  L.push("Thank you for choosing "+(s.name.split(" ")[0])+".");
+  return L.join("\n");
+}
+function sendWhatsApp(o){
+  var num = waNumber(o.cust.mobile);
+  if(!num){ toast("No mobile number saved for this customer"); return; }
+  var url = "https://wa.me/"+num+"?text="+encodeURIComponent(waText(o));
+  var win = window.open(url, "_blank");
+  if(!win) location.href = url;
+}
+function copyText(txt){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(function(){ toast("Message copied"); },function(){ fallback(); });
+  } else fallback();
+  function fallback(){
+    var ta=document.createElement("textarea");
+    ta.value=txt; ta.style.position="fixed"; ta.style.opacity="0";
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand("copy"); toast("Message copied"); }catch(e){ toast("Copy not supported here"); }
+    ta.remove();
+  }
+}
+function savedModal(o){
+  var num = waNumber(o.cust.mobile);
+  openModal("Order "+o.no+" saved",
+    '<p class="hint" style="margin-top:0">'+esc(o.cust.name)+(num?" · WhatsApp +"+esc(num):" · no mobile number saved")+'</p>'+
+    '<div class="btn-row">'+
+      (num?'<button class="btn primary" id="mWa">Send on WhatsApp</button>':'')+
+      '<button class="btn" id="mPrint">Print all copies</button>'+
+      '<button class="btn" id="mCopy">Copy message</button>'+
+      '<button class="btn ghost" id="mDone">Done</button>'+
+    '</div>'+
+    '<p class="hint">WhatsApp opens with the message ready. Press send there.</p>'+
+    '<pre style="white-space:pre-wrap;font:inherit;font-size:13px;background:#f7fafc;border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:10px">'+esc(waText(o))+'</pre>');
+  var w=$("#mWa"); if(w) w.addEventListener("click", function(){ sendWhatsApp(o); });
+  $("#mPrint").addEventListener("click", function(){ printOrder(o); });
+  $("#mCopy").addEventListener("click", function(){ copyText(waText(o)); });
+  $("#mDone").addEventListener("click", closeModal);
+}
+
 /* ============================================================
    8. ORDERS LIST
    ============================================================ */
@@ -912,6 +1118,7 @@ function renderOrders(){
       '<div class="acts">'+
         '<button class="btn sm" data-view-order="'+o.id+'">Details</button>'+
         '<button class="btn sm" data-print="'+o.id+'">Print</button>'+
+        (o.cust.mobile?'<button class="btn sm" data-wa="'+o.id+'">WhatsApp</button>':'')+
         (paid?"":'<button class="btn sm primary" data-pay="'+o.id+'">Receive payment</button>')+
       '</div></div>'+
       '<div class="money"><b>'+money(c.incl)+'</b>'+
@@ -925,6 +1132,7 @@ function bindRowActions(box){
   $$("[data-view-order]",box).forEach(function(b){ b.addEventListener("click",function(){ openOrder(b.dataset.viewOrder); }); });
   $$("[data-print]",box).forEach(function(b){ b.addEventListener("click",function(){ var o=byId(b.dataset.print); if(o) printOrder(o); }); });
   $$("[data-pay]",box).forEach(function(b){ b.addEventListener("click",function(){ payModal(b.dataset.pay); }); });
+  $$("[data-wa]",box).forEach(function(b){ b.addEventListener("click",function(){ var o=byId(b.dataset.wa); if(o) sendWhatsApp(o); }); });
 }
 function byId(id){ return DB.orders.filter(function(o){ return o.id===id; })[0]; }
 ["fSearch","fMonth","fStatus"].forEach(function(id){ $("#"+id).addEventListener("input", renderOrders); });
@@ -967,6 +1175,8 @@ function openOrder(id){
       '<button class="btn primary" data-m-print="'+o.id+'">Print all copies</button>'+
       '<button class="btn" data-m-print1="'+o.id+'">Customer copy only</button>'+
       '<button class="btn" data-m-fact="'+o.id+'">Factory copy only</button>'+
+      (o.cust.mobile?'<button class="btn dark" data-m-wa="'+o.id+'">Send on WhatsApp</button>':'')+
+      '<button class="btn" data-m-copy="'+o.id+'">Copy message</button>'+
       (c.balance>0.009?'<button class="btn dark" data-m-pay="'+o.id+'">Receive payment</button>':'')+
       '<button class="btn" data-m-edit="'+o.id+'">Edit</button>'+
       '<button class="btn danger" data-m-del="'+o.id+'">Delete</button>'+
@@ -975,12 +1185,15 @@ function openOrder(id){
   $("[data-m-print]").addEventListener("click",function(){ printOrder(o); });
   $("[data-m-print1]").addEventListener("click",function(){ printOrder(o,"CUSTOMER"); });
   $("[data-m-fact]").addEventListener("click",function(){ printOrder(o,"FACTORY"); });
+  var wb=$("[data-m-wa]"); if(wb) wb.addEventListener("click",function(){ sendWhatsApp(o); });
+  $("[data-m-copy]").addEventListener("click",function(){ copyText(waText(o)); });
   var pb=$("[data-m-pay]"); if(pb) pb.addEventListener("click",function(){ payModal(o.id); });
   $("[data-m-edit]").addEventListener("click",function(){ editOrder(o.id); });
   $("[data-m-del]").addEventListener("click",function(){
     if(!confirm("Delete order "+o.no+"? This cannot be undone.")) return;
     DB.orders = DB.orders.filter(function(x){ return x.id!==o.id; });
-    save(); closeModal(); refreshChrome(); renderOrders(); toast("Order deleted");
+    DB.tomb.push({id:o.id, no:o.no, u:nowISO(), dirty:true});
+    save(); cloudPush(); closeModal(); refreshChrome(); renderOrders(); toast("Order deleted");
   });
 }
 
@@ -1000,7 +1213,7 @@ function payModal(id){
     if(amt<=0){ toast("Enter an amount"); return; }
     o.payments = o.payments||[];
     o.payments.push({date:$("#payDate").value||todayISO(), amount:amt, mode:$("#payMode").value});
-    save(); closeModal(); refreshChrome(); renderOrders(); renderCustomers(); toast("Payment recorded");
+    touch(o); save(); cloudPush(); closeModal(); refreshChrome(); renderOrders(); renderCustomers(); toast("Payment recorded");
   });
 }
 
@@ -1044,12 +1257,17 @@ function openCustomer(key){
     var k=calc(o);
     return '<tr><td>'+dmy(o.date)+'</td><td>'+esc(o.no)+'</td><td class="n">'+k.qty+'</td><td class="n">'+money(k.incl)+'</td><td class="n">'+money(k.balance)+'</td></tr>';
   }).join("");
+  var sp = specialRates(c.mobile);
+  var spHtml = sp.length ? '<div class="scroll" style="margin-top:12px"><table class="data"><thead><tr><th>Agreed rate</th><th>Service</th><th class="n">Their rate</th><th class="n">List</th></tr></thead><tbody>'+
+      sp.map(function(x){ return '<tr><td>'+esc(x.name)+'</td><td>'+esc(TYPE_LABEL[x.type]||x.type)+'</td><td class="n"><b>'+money(x.rate)+'</b></td><td class="n">'+money(x.listed)+'</td></tr>'; }).join("")+
+      '</tbody></table></div>' : "";
   openModal(c.name,
     '<p class="hint" style="margin-top:0">'+esc(c.mobile||"")+(c.area?" · "+esc(c.area):"")+'</p>'+
     '<div class="kpis"><div class="kpi"><b>'+c.orders.length+'</b><span>Orders</span></div>'+
     '<div class="kpi"><b>'+money(c.spent)+'</b><span>Billed (AED)</span></div>'+
     '<div class="kpi '+(c.due>0.009?"due":"")+'"><b>'+money(c.due)+'</b><span>Pending (AED)</span></div>'+
     '<div class="kpi"><b>'+dmy(c.last).slice(0,5)+'</b><span>Last order</span></div></div>'+
+    spHtml +
     '<div class="scroll" style="margin-top:12px"><table class="data"><thead><tr><th>Date</th><th>Receipt</th><th class="n">Pcs</th><th class="n">Net</th><th class="n">Balance</th></tr></thead><tbody>'+rows+'</tbody></table></div>');
 }
 $("#custSearch").addEventListener("input", renderCustomers);
@@ -1173,12 +1391,12 @@ function renderPrices(){
     inp.addEventListener("change", function(){
       var it=DB.items[Number(inp.dataset.i)], t=inp.dataset.t, v=inp.value.trim();
       if(v==="") delete it[t]; else it[t]=Number(v)||0;
-      save(); buildKeymap(); fillDatalists(); toast("Price updated");
+      saveI(); buildKeymap(); fillDatalists(); toast("Price updated");
     });
   });
   $$("#priceTable [data-pdel]").forEach(function(b){
     b.addEventListener("click", function(){
-      DB.items.splice(Number(b.dataset.pdel),1); save(); buildKeymap(); renderPrices(); fillDatalists();
+      DB.items.splice(Number(b.dataset.pdel),1); saveI(); buildKeymap(); renderPrices(); fillDatalists();
     });
   });
 }
@@ -1192,14 +1410,14 @@ $("#btnAddPrice").addEventListener("click", function(){
   if(!("D" in it || "W" in it || "H" in it)){ toast("Enter at least one rate"); return; }
   DB.items.push(it);
   DB.items.sort(function(a,b){ return a.c===b.c ? a.n.localeCompare(b.n) : String(a.c).localeCompare(String(b.c)); });
-  save(); buildKeymap(); fillDatalists();
+  saveI(); buildKeymap(); fillDatalists();
   ["pName","pD","pW","pH"].forEach(function(id){ $("#"+id).value=""; });
   renderPrices(); toast("Item added");
 });
 $("#btnResetPrices").addEventListener("click", function(){
   if(!confirm("Replace the current price list with the original WashCare list? Saved orders are not affected.")) return;
   DB.items = JSON.parse(JSON.stringify(DEFAULT_ITEMS));
-  save(); buildKeymap(); fillDatalists(); renderPrices(); toast("Price list restored");
+  saveI(); buildKeymap(); fillDatalists(); renderPrices(); toast("Price list restored");
 });
 
 /* ============================================================
@@ -1211,6 +1429,10 @@ function fillSettings(){
   $("#sWeb").value=s.web; $("#sTrn").value=s.trn||""; $("#sVat").value=s.vat;
   $("#sUrgent").value=s.urgentPct; $("#sPrefix").value=s.prefix; $("#sNext").value=s.next;
   $("#sTerms").value=s.terms; $("#sFooter").value=s.footer;
+  $("#sDevice").value=s.deviceCode||"";
+  $("#sUser").value = CLOUD.user ? (CLOUD.user.email||"signed in") : (cloudConfigured()?"not signed in":"sync not configured");
+  setSync(CLOUD.state);
+  $("#sCC").value=s.cc||"971"; $("#sWaPrices").checked=s.waPrices!==false; $("#sWaLine").value=s.waLine||"";
   $("#cpOffice").checked=!!s.copies.office; $("#cpCustomer").checked=!!s.copies.customer; $("#cpFactory").checked=!!s.copies.factory;
   $("#logoPreview").innerHTML = s.logo ? '<img src="'+s.logo+'" alt="Current logo">' : '<span class="hint" style="padding:6px;text-align:center">No logo yet</span>';
 }
@@ -1221,7 +1443,9 @@ $("#btnSaveSettings").addEventListener("click", function(){
   s.vat=Number($("#sVat").value)||0; s.urgentPct=Number($("#sUrgent").value)||0;
   s.prefix=$("#sPrefix").value; s.next=Math.max(1, parseInt($("#sNext").value,10)||1);
   s.terms=$("#sTerms").value.trim(); s.footer=$("#sFooter").value.trim();
-  save(); refreshChrome(); toast("Settings saved");
+  s.cc=digits($("#sCC").value)||"971"; s.waPrices=$("#sWaPrices").checked; s.waLine=$("#sWaLine").value.trim();
+  s.deviceCode=$("#sDevice").value.trim().toUpperCase().replace(/[^A-Z0-9]/g,"");
+  saveS(); refreshChrome(); toast("Settings saved");
 });
 ["cpOffice","cpCustomer","cpFactory"].forEach(function(id){
   $("#"+id).addEventListener("change", function(){
@@ -1233,10 +1457,10 @@ $("#logoInput").addEventListener("change", function(e){
   var f=e.target.files[0]; if(!f) return;
   if(f.size > 900*1024){ toast("Logo is too large. Use an image under 900 KB."); return; }
   var rd=new FileReader();
-  rd.onload=function(){ DB.settings.logo=rd.result; save(); fillSettings(); refreshChrome(); toast("Logo saved"); };
+  rd.onload=function(){ DB.settings.logo=rd.result; saveS(); fillSettings(); refreshChrome(); toast("Logo saved"); };
   rd.readAsDataURL(f);
 });
-$("#btnRemoveLogo").addEventListener("click", function(){ DB.settings.logo=RECEIPT_LOGO; save(); fillSettings(); toast("Official logo restored"); });
+$("#btnRemoveLogo").addEventListener("click", function(){ DB.settings.logo=RECEIPT_LOGO; saveS(); fillSettings(); toast("Official logo restored"); });
 
 /* ============================================================
    14. BACKUP / EXPORT
@@ -1294,6 +1518,206 @@ $("#btnWipe").addEventListener("click", function(){
   DB=defaultDB(); save(); refreshChrome(); fillSettings(); resetForm(); toast("All data deleted");
 });
 
+
+/* ============================================================
+   14b. CLOUD SYNC (Supabase)
+   ============================================================ */
+var LOCAL_ONLY_KEYS = ["next","deviceCode","copies","pad"];
+var CLOUD = {sb:null, user:null, state:"off", pushTimer:null, pulling:false};
+
+function cloudConfigured(){
+  var c = window.WASHCARE_CONFIG;
+  return !!(c && c.supabaseUrl && c.supabaseKey && String(c.supabaseUrl).indexOf("http")===0);
+}
+function pendingCount(){
+  var n = DB.orders.filter(function(o){ return o._dirty; }).length +
+          DB.tomb.filter(function(t){ return t.dirty; }).length;
+  if(DB.meta.sDirty) n++; if(DB.meta.iDirty) n++;
+  return n;
+}
+function setSync(state){
+  CLOUD.state = state;
+  var pill=$("#hdSync"); if(!pill) return;
+  if(!cloudConfigured()){ pill.hidden=true; return; }
+  pill.hidden=false;
+  var p = pendingCount();
+  var map = {
+    off:["Local only","warnp"], offline:[p?("Offline · "+p+" waiting"):"Offline","warnp"],
+    syncing:["Syncing…",""], synced:[p?(p+" waiting"):"Synced","ok"],
+    error:["Sync problem","warnp"], signin:["Not signed in","warnp"]
+  };
+  var m = map[state]||map.off;
+  pill.textContent = m[0];
+  pill.className = "pill "+(m[1]||"");
+  var st=$("#syncState");
+  if(st) st.textContent = cloudConfigured() ? (CLOUD.user ? m[0] : "Not signed in") : "Not configured";
+}
+function sharedSettings(){
+  var o={}; Object.keys(DB.settings).forEach(function(k){ if(LOCAL_ONLY_KEYS.indexOf(k)<0) o[k]=DB.settings[k]; });
+  return o;
+}
+function applyShared(obj){
+  if(!obj) return;
+  Object.keys(obj).forEach(function(k){ if(LOCAL_ONLY_KEYS.indexOf(k)<0) DB.settings[k]=obj[k]; });
+}
+function stripOrder(o){
+  var c={}; Object.keys(o).forEach(function(k){ if(k!=="_dirty") c[k]=o[k]; });
+  return c;
+}
+function rerender(){
+  refreshChrome();
+  var v = $$(".view").filter(function(x){ return !x.hidden; })[0];
+  if(!v) return;
+  if(v.id==="view-orders") renderOrders();
+  if(v.id==="view-customers") renderCustomers();
+  if(v.id==="view-reports") renderReports();
+  if(v.id==="view-prices") renderPrices();
+  if(v.id==="view-new") renderTotals();
+}
+
+function cloudInit(){
+  if(!cloudConfigured()){ setSync("off"); return; }
+  setSync("syncing");
+  var s=document.createElement("script");
+  s.src = window.WASHCARE_CONFIG.sdk || "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js";
+  s.onload = function(){
+    try{
+      CLOUD.sb = window.supabase.createClient(window.WASHCARE_CONFIG.supabaseUrl, window.WASHCARE_CONFIG.supabaseKey,
+        {auth:{persistSession:true, autoRefreshToken:true}});
+    }catch(e){ setSync("error"); return; }
+    CLOUD.sb.auth.getSession().then(function(res){
+      var sess = res && res.data && res.data.session;
+      if(sess){ CLOUD.user = sess.user; cloudStart(); }
+      else { setSync("signin"); showLogin(); }
+    }).catch(function(){ setSync("offline"); });
+  };
+  s.onerror = function(){ setSync("offline"); };
+  document.head.appendChild(s);
+}
+function showLogin(){
+  $("#loginLogo").src = BRAND_LOGO;
+  $("#login").hidden = false;
+}
+function cloudStart(){
+  $("#login").hidden = true;
+  if(!DB.settings.deviceCode){
+    toast("Set a device code in Settings so receipt numbers stay unique");
+  }
+  cloudSync();
+  cloudSubscribe();
+  setInterval(cloudSync, 45000);
+  window.addEventListener("online", cloudSync);
+}
+function cloudSubscribe(){
+  try{
+    CLOUD.sb.channel("wc-sync")
+      .on("postgres_changes", {event:"*", schema:"public", table:"orders"}, function(){ cloudPull(); })
+      .on("postgres_changes", {event:"*", schema:"public", table:"app_config"}, function(){ cloudPull(); })
+      .subscribe();
+  }catch(e){}
+}
+function cloudReady(){ return CLOUD.sb && CLOUD.user; }
+function cloudSync(){ cloudPull().then(cloudPushNow); }
+
+function cloudPull(){
+  if(!cloudReady() || CLOUD.pulling) return Promise.resolve();
+  CLOUD.pulling = true; setSync("syncing");
+  var since = DB.meta.lastPull || "1970-01-01T00:00:00Z";
+  return CLOUD.sb.from("orders").select("id,no,data,updated_at,deleted").gt("updated_at", since)
+    .then(function(res){
+      if(res.error) throw res.error;
+      var maxU = since, changed=false;
+      (res.data||[]).forEach(function(r){
+        if(r.updated_at > maxU) maxU = r.updated_at;
+        var idx = DB.orders.findIndex(function(o){ return o.id===r.id; });
+        var local = idx>-1 ? DB.orders[idx] : null;
+        if(local && local._dirty) return;
+        if(r.deleted){
+          if(local){ DB.orders.splice(idx,1); changed=true; }
+          return;
+        }
+        if(!r.data) return;
+        var obj = r.data; obj.id=r.id; obj.no=r.no; obj._u=r.updated_at; obj._dirty=false;
+        if(!local){ DB.orders.push(obj); changed=true; }
+        else if(r.updated_at > (local._u||"")){ DB.orders[idx]=obj; changed=true; }
+      });
+      DB.orders.sort(function(a,b){ return String(a._u||"").localeCompare(String(b._u||"")); });
+      return CLOUD.sb.from("app_config").select("key,data,updated_at").then(function(cf){
+        if(cf.error) throw cf.error;
+        (cf.data||[]).forEach(function(r){
+          if(r.updated_at > maxU) maxU = r.updated_at;
+          if(r.key==="settings" && !DB.meta.sDirty && r.updated_at > (DB.meta.sU||"")){
+            applyShared(r.data); DB.meta.sU=r.updated_at; changed=true;
+          }
+          if(r.key==="items" && !DB.meta.iDirty && r.updated_at > (DB.meta.iU||"") && Array.isArray(r.data)){
+            DB.items = r.data; DB.meta.iU=r.updated_at; changed=true;
+          }
+        });
+        DB.meta.lastPull = maxU;
+        save();
+        if(changed) rerender();
+        CLOUD.pulling=false; setSync("synced");
+      });
+    })
+    .catch(function(){ CLOUD.pulling=false; setSync("offline"); });
+}
+
+function cloudPush(){
+  if(!cloudReady()){ setSync(cloudConfigured() ? (CLOUD.sb?"signin":"offline") : "off"); return; }
+  clearTimeout(CLOUD.pushTimer);
+  CLOUD.pushTimer = setTimeout(cloudPushNow, 500);
+}
+function cloudPushNow(){
+  if(!cloudReady()) return Promise.resolve();
+  var dev = (DB.settings.deviceCode||"").toUpperCase();
+  var rows = DB.orders.filter(function(o){ return o._dirty; }).map(function(o){
+    return {id:o.id, no:o.no, data:stripOrder(o), updated_at:o._u||nowISO(), deleted:false, device:dev};
+  });
+  DB.tomb.filter(function(t){ return t.dirty; }).forEach(function(t){
+    rows.push({id:t.id, no:t.no||"", data:{}, updated_at:t.u||nowISO(), deleted:true, device:dev});
+  });
+  var jobs=[];
+  if(rows.length) jobs.push(CLOUD.sb.from("orders").upsert(rows, {onConflict:"id"}));
+  if(DB.meta.sDirty) jobs.push(CLOUD.sb.from("app_config").upsert([{key:"settings", data:sharedSettings(), updated_at:DB.meta.sU||nowISO()}], {onConflict:"key"}));
+  if(DB.meta.iDirty) jobs.push(CLOUD.sb.from("app_config").upsert([{key:"items", data:DB.items, updated_at:DB.meta.iU||nowISO()}], {onConflict:"key"}));
+  if(!jobs.length){ setSync("synced"); return Promise.resolve(); }
+  setSync("syncing");
+  return Promise.all(jobs).then(function(res){
+    var bad = res.filter(function(r){ return r && r.error; });
+    if(bad.length){ setSync("error"); return; }
+    DB.orders.forEach(function(o){ o._dirty=false; });
+    DB.tomb = [];
+    DB.meta.sDirty=false; DB.meta.iDirty=false;
+    save(); setSync("synced");
+  }).catch(function(){ setSync("offline"); });
+}
+
+$("#loginGo").addEventListener("click", function(){
+  var em=$("#loginEmail").value.trim(), pw=$("#loginPass").value;
+  if(!em||!pw){ $("#loginErr").textContent="Enter email and password."; return; }
+  $("#loginErr").textContent="Signing in…";
+  CLOUD.sb.auth.signInWithPassword({email:em, password:pw}).then(function(res){
+    if(res.error){ $("#loginErr").textContent=res.error.message; return; }
+    CLOUD.user = res.data.user; $("#loginErr").textContent=""; $("#loginPass").value="";
+    cloudStart(); fillSettings();
+  }).catch(function(){ $("#loginErr").textContent="No connection. You can work offline for now."; });
+});
+$("#loginSkip").addEventListener("click", function(){
+  $("#login").hidden=true; setSync("signin");
+  toast("Working offline. Sign in from Settings to sync.");
+});
+$("#btnSyncNow").addEventListener("click", function(){
+  if(!cloudConfigured()){ toast("Add your Supabase details to config.js first"); return; }
+  if(!CLOUD.sb){ cloudInit(); return; }
+  if(!CLOUD.user){ showLogin(); return; }
+  cloudSync(); toast("Syncing…");
+});
+$("#btnSignOut").addEventListener("click", function(){
+  if(!CLOUD.sb){ toast("Not signed in"); return; }
+  if(!confirm("Sign out of this device? Anything not yet synced stays saved here.")) return;
+  CLOUD.sb.auth.signOut().then(function(){ CLOUD.user=null; setSync("signin"); showLogin(); });
+});
+
 /* ============================================================
    15. BOOT
    ============================================================ */
@@ -1311,6 +1735,7 @@ function refreshChrome(){
   var s=DB.settings;
   $("#hdName").textContent=s.name; $("#hdWeb").textContent=s.web;
   $("#hdLogo").innerHTML = '<img src="'+BRAND_LOGO+'" alt="">';
+  setSync(CLOUD.state);
   var due = DB.orders.reduce(function(a,o){ return a+calc(o).balance; },0);
   $("#hdStat").textContent = DB.orders.length+" orders · AED "+money(due)+" due";
   $("#urgentPctLabel").textContent = (Number(s.urgentPct)===100 ? "(double rate)" : "(+"+(Number(s.urgentPct)||0)+"%)");
@@ -1323,6 +1748,7 @@ $("#rMonth").value = monthOf(todayISO());
 refreshChrome();
 serviceOptions(null);
 resetForm();
+cloudInit();
 showView("new");
 if("serviceWorker" in navigator && location.protocol.indexOf("http")===0){
   navigator.serviceWorker.register("sw.js").catch(function(){});
