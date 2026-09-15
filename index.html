@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
 <title>WashCare Laundry Manager</title>
+<link rel="apple-touch-icon" href="icon-192.png">
 <script src="config.js"></script>
 <meta name="theme-color" content="#1a7bbf">
 <link rel="manifest" href="manifest.json">
@@ -240,6 +241,7 @@ table.data td.n,table.data th.n{text-align:right;font-variant-numeric:tabular-nu
     <button class="tab" role="tab" data-view="new" aria-selected="true">New order</button>
     <button class="tab" role="tab" data-view="orders" aria-selected="false">Orders</button>
     <button class="tab" role="tab" data-view="customers" aria-selected="false">Customers</button>
+    <button class="tab" role="tab" data-view="expenses" aria-selected="false">Expenses</button>
     <button class="tab" role="tab" data-view="reports" aria-selected="false">Reports</button>
     <button class="tab" role="tab" data-view="prices" aria-selected="false">Price list</button>
     <button class="tab" role="tab" data-view="settings" aria-selected="false">Settings</button>
@@ -348,6 +350,49 @@ table.data td.n,table.data th.n{text-align:right;font-variant-numeric:tabular-nu
     </div>
   </section>
 
+  <!-- ============ EXPENSES ============ -->
+  <section class="view" id="view-expenses" hidden>
+    <div class="panel">
+      <div class="panel-hd"><h2>Record an expense</h2><span class="sub">Money going out of the shop</span></div>
+      <div class="panel-bd">
+        <div class="grid g3 keep">
+          <label class="fld"><span>Date</span><input type="date" id="eDate"></label>
+          <label class="fld"><span>Amount (AED)</span><input type="number" id="eAmount" step="0.25" min="0" inputmode="decimal"></label>
+          <label class="fld"><span>Category</span>
+            <select id="eCat">
+              <option>Supplies</option><option>Salary</option><option>Rent</option>
+              <option>Fuel / transport</option><option>Utilities</option><option>Maintenance</option>
+              <option>Machine / equipment</option><option>Government / licence</option><option>Other</option>
+            </select>
+          </label>
+          <label class="fld"><span>Paid by</span>
+            <select id="eMode"><option>Cash</option><option>Card</option><option>Bank transfer</option></select>
+          </label>
+          <label class="fld"><span>Spent by</span>
+            <input type="text" id="eBy" list="staffList" placeholder="Staff name or Shop">
+            <datalist id="staffList"></datalist>
+          </label>
+          <label class="fld" style="grid-column:span 2"><span>Paid to / details</span><input type="text" id="eNote" placeholder="Al Madina Trading — detergent 20kg"></label>
+        </div>
+        <div class="btn-row" style="margin-top:12px"><button class="btn primary" id="btnAddExpense">Save expense</button></div>
+        <p class="hint" id="expHint"></p>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-bd">
+        <div class="grid g2 keep">
+          <label class="fld"><span>Month</span><input type="month" id="eMonth"></label>
+          <label class="fld"><span>Category</span><select id="eFilterCat"><option value="">All categories</option></select></label>
+          <label class="fld" style="grid-column:1/-1"><span>Spent by</span><select id="eFilterBy"><option value="">Everyone</option></select></label>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-hd"><h2>Expenses</h2><span class="sub" id="expSummary"></span></div>
+      <div id="expList"><div class="empty">No expenses recorded yet.</div></div>
+    </div>
+  </section>
+
   <!-- ============ REPORTS ============ -->
   <section class="view" id="view-reports" hidden>
     <div class="panel">
@@ -371,6 +416,18 @@ table.data td.n,table.data th.n{text-align:right;font-variant-numeric:tabular-nu
     <div class="panel">
       <div class="panel-hd"><h2>Items sold</h2></div>
       <div class="scroll"><table class="data" id="rItems"></table></div>
+    </div>
+    <div class="panel" id="panelExpenses">
+      <div class="panel-hd"><h2>Expenses by category</h2></div>
+      <div class="scroll"><table class="data" id="rExp"></table></div>
+    </div>
+    <div class="panel" id="panelExpStaff">
+      <div class="panel-hd"><h2>Expenses by staff</h2><span class="sub">Who spent how much</span></div>
+      <div class="scroll"><table class="data" id="rExpStaff"></table></div>
+    </div>
+    <div class="panel" id="panelStaff">
+      <div class="panel-hd"><h2>By staff</h2><span class="sub">Who took the orders and the cash</span></div>
+      <div class="scroll"><table class="data" id="rStaff"></table></div>
     </div>
     <div class="panel">
       <div class="panel-hd"><h2>Month by month</h2></div>
@@ -414,7 +471,24 @@ table.data td.n,table.data th.n{text-align:right;font-variant-numeric:tabular-nu
 
   <!-- ============ SETTINGS ============ -->
   <section class="view" id="view-settings" hidden>
-    <div class="panel">
+    <div class="panel" id="panelRole">
+      <div class="panel-hd"><h2>This device</h2><span class="sub" id="roleState"></span></div>
+      <div class="panel-bd">
+        <p class="hint" style="margin-top:0" id="roleExplain"></p>
+        <div class="btn-row">
+          <button class="btn" id="btnRoleStaff">Lock as staff device</button>
+          <button class="btn primary" id="btnRoleOwner">Unlock as owner</button>
+        </div>
+        <div id="pinSetup" style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
+          <div class="grid g2 keep">
+            <label class="fld"><span>Owner PIN</span><input type="password" id="sPin" inputmode="numeric" placeholder="4-8 digits"></label>
+            <label class="fld"><span>&nbsp;</span><button class="btn" id="btnSetPin" style="width:100%">Set owner PIN</button></label>
+          </div>
+          <p class="hint">Staff devices need this PIN to unlock owner mode. Do not share it.</p>
+        </div>
+      </div>
+    </div>
+    <div class="panel" id="panelBusiness">
       <div class="panel-hd"><h2>Business details</h2><span class="sub">These print on every receipt</span></div>
       <div class="panel-bd">
         <div class="grid g2">
@@ -436,7 +510,7 @@ table.data td.n,table.data th.n{text-align:right;font-variant-numeric:tabular-nu
       </div>
     </div>
 
-    <div class="panel">
+    <div class="panel" id="panelLogo">
       <div class="panel-hd"><h2>Receipt logo</h2><span class="sub">PNG or JPG, ideally 400px wide</span></div>
       <div class="panel-bd">
         <div class="brandmark" style="width:120px;height:70px;border-radius:8px" id="logoPreview"></div>
@@ -460,7 +534,7 @@ table.data td.n,table.data th.n{text-align:right;font-variant-numeric:tabular-nu
       </div>
     </div>
 
-    <div class="panel">
+    <div class="panel" id="panelWa">
       <div class="panel-hd"><h2>WhatsApp</h2><span class="sub">Used by the Send on WhatsApp button</span></div>
       <div class="panel-bd">
         <div class="grid g2 keep">
@@ -487,7 +561,7 @@ table.data td.n,table.data th.n{text-align:right;font-variant-numeric:tabular-nu
       </div>
     </div>
 
-    <div class="panel">
+    <div class="panel" id="panelData">
       <div class="panel-hd"><h2>Backup and data</h2></div>
       <div class="panel-bd">
         <div class="btn-row">
@@ -563,12 +637,14 @@ function defaultDB(){
       terms:DEFAULT_TERMS, footer:"Care for Your Clothes",
       logo:RECEIPT_LOGO, copies:{office:true, customer:true, factory:true},
       cc:"971", waPrices:true, waLine:"Free pickup and delivery across Dubai.",
-      deviceCode:""
+      deviceCode:"", role:"owner", pinHash:""
     },
     items: DEFAULT_ITEMS.slice(),
     orders: [],
     tomb: [],
-    meta: {sU:"", sDirty:false, iU:"", iDirty:false, lastPull:""}
+    expenses: [],
+    expTomb: [],
+    meta: {sU:"", sDirty:false, iU:"", iDirty:false, lastPull:"", lastPullE:""}
   };
 }
 
@@ -583,6 +659,8 @@ var DB = defaultDB();
       if(Array.isArray(p.items) && p.items.length && p.items[0] && p.items[0].n && ("D" in p.items[0] || "W" in p.items[0] || "H" in p.items[0])) DB.items = p.items;
       if(Array.isArray(p.orders)) DB.orders = p.orders;
       if(Array.isArray(p.tomb)) DB.tomb = p.tomb;
+      if(Array.isArray(p.expenses)) DB.expenses = p.expenses;
+      if(Array.isArray(p.expTomb)) DB.expTomb = p.expTomb;
       if(p.meta) DB.meta = Object.assign(DB.meta, p.meta);
     }catch(e){ /* keep defaults on a corrupt file */ }
   }
@@ -653,6 +731,24 @@ function calc(o){
   var qty = (o.lines||[]).reduce(function(a,l){ return a+(Number(l.qty)||0); },0);
   return {sub:sub, urgent:urgent, disc:disc, incl:incl, before:before, vat:vat, vatRate:vatRate, paid:paid, balance:balance, qty:r2(qty)};
 }
+var MODES = ["Cash","Card","Bank transfer"];
+function modeKey(m){
+  var s=String(m||"Cash").toLowerCase();
+  if(s.indexOf("card")>-1) return "Card";
+  if(s.indexOf("bank")>-1 || s.indexOf("transfer")>-1) return "Bank transfer";
+  if(s.indexOf("cash")>-1) return "Cash";
+  return "Other";
+}
+function collections(o){
+  var out={Cash:0, Card:0, "Bank transfer":0, Other:0};
+  var adv=Number(o.advance)||0;
+  if(adv>0) out[modeKey(o.mode)] = r2(out[modeKey(o.mode)] + adv);
+  (o.payments||[]).forEach(function(p){
+    var k=modeKey(p.mode), amt=Number(p.amount)||0;
+    out[k] = r2(out[k] + amt);
+  });
+  return out;
+}
 function isPaid(o){ return calc(o).balance <= 0.009; }
 function prevDue(mobile, excludeId){
   var key = digits(mobile); if(!key) return 0;
@@ -661,6 +757,56 @@ function prevDue(mobile, excludeId){
     if(digits(o.cust.mobile)!==key) return a;
     return a + calc(o).balance;
   },0));
+}
+
+function whoAmI(){
+  if(typeof CLOUD!=="undefined" && CLOUD.user && CLOUD.user.email) return CLOUD.user.email;
+  var dc=(DB.settings.deviceCode||"").toUpperCase();
+  return dc ? "device "+dc : "this device";
+}
+function shortWho(w){ return String(w||"—").split("@")[0]; }
+function isStaff(){ return DB.settings.role === "staff"; }
+function mob(m){
+  if(!isStaff()) return m||"";
+  var d=digits(m); if(!d) return "";
+  return "•••• "+d.slice(-4);
+}
+function sha(txt){
+  var seed = "wc:"+txt;
+  if(window.crypto && window.crypto.subtle && window.TextEncoder){
+    return crypto.subtle.digest("SHA-256", new TextEncoder().encode(seed)).then(function(buf){
+      return Array.prototype.map.call(new Uint8Array(buf), function(b){ return ("0"+b.toString(16)).slice(-2); }).join("");
+    }).catch(function(){ return weakHash(seed); });
+  }
+  return Promise.resolve(weakHash(seed));
+}
+function weakHash(s){
+  var h1=0x811c9dc5, h2=0x01000193;
+  for(var i=0;i<s.length;i++){
+    h1 = (h1 ^ s.charCodeAt(i)) * 16777619 >>> 0;
+    h2 = (h2 + s.charCodeAt(i) * (i+7)) * 2654435761 >>> 0;
+  }
+  return "w"+h1.toString(16)+h2.toString(16);
+}
+function applyRole(){
+  var staff = isStaff();
+  $$(".tab").forEach(function(b){
+    if(b.dataset.view==="customers" || b.dataset.view==="prices" || b.dataset.view==="expenses") b.hidden = staff;
+  });
+  ["panelBusiness","panelLogo","panelWa","panelData"].forEach(function(id){
+    var el=$("#"+id); if(el) el.hidden = staff;
+  });
+  var ps=$("#pinSetup"); if(ps) ps.hidden = staff;
+  var rs=$("#roleState"); if(rs) rs.textContent = staff ? "Staff device" : "Owner device";
+  var re=$("#roleExplain");
+  if(re) re.textContent = staff
+    ? "Customer phone numbers are hidden, the customer list and price list are locked, and data cannot be exported from this device."
+    : "Full access. Lock this device as a staff device before handing it to the counter.";
+  var so=$("#btnRoleOwner"), st=$("#btnRoleStaff");
+  if(so) so.hidden = !staff;
+  if(st) st.hidden = staff;
+  var cust=$$(".view").filter(function(v){ return v.id==="view-customers"||v.id==="view-prices"||v.id==="view-expenses"; });
+  if(staff && cust.some(function(v){ return !v.hidden; })) showView("new");
 }
 
 /* ============================================================
@@ -675,6 +821,7 @@ function showView(name){
   if(name==="customers") renderCustomers();
   if(name==="reports") renderReports();
   if(name==="prices") renderPrices();
+  if(name==="expenses") renderExpenses();
   if(name==="settings") fillSettings();
 }
 $$(".tab").forEach(function(b){ b.addEventListener("click", function(){ showView(b.dataset.view); }); });
@@ -863,6 +1010,9 @@ function saveOrder(){
   var o = formOrder();
   if(!o.cust.name){ toast("Customer name is required"); $("#cName").focus(); return null; }
   if(!o.lines.length){ toast("Add at least one item"); $("#iName").focus(); return null; }
+  o.dev = (DB.settings.deviceCode||"").toUpperCase();
+  if(draft.editingId){ o.by = draft.by || o.by; o.editBy = whoAmI(); o.editAt = nowISO(); }
+  else { o.by = whoAmI(); }
   touch(o);
   if(draft.editingId){
     var i = DB.orders.findIndex(function(x){ return x.id===draft.editingId; });
@@ -886,7 +1036,7 @@ $("#btnSavePrint").addEventListener("click", function(){
 
 function editOrder(id){
   var o = DB.orders.filter(function(x){ return x.id===id; })[0]; if(!o) return;
-  draft = { lines:o.lines.slice(), editingId:o.id, no:o.no, createdTime:o.time, payments:o.payments||[] };
+  draft = { lines:o.lines.slice(), editingId:o.id, no:o.no, createdTime:o.time, payments:o.payments||[], by:o.by };
   $("#cMobile").value=o.cust.mobile; $("#cName").value=o.cust.name; $("#cArea").value=o.cust.area;
   $("#cBuilding").value=o.cust.building; $("#cFlat").value=o.cust.flat;
   $("#oDate").value=o.date; $("#dDate").value=o.delivery.date; $("#dTime").value=o.delivery.time;
@@ -1072,7 +1222,7 @@ function copyText(txt){
 function savedModal(o){
   var num = waNumber(o.cust.mobile);
   openModal("Order "+o.no+" saved",
-    '<p class="hint" style="margin-top:0">'+esc(o.cust.name)+(num?" · WhatsApp +"+esc(num):" · no mobile number saved")+'</p>'+
+    '<p class="hint" style="margin-top:0">'+esc(o.cust.name)+(num?" · WhatsApp "+esc(mob(o.cust.mobile)):" · no mobile number saved")+'</p>'+
     '<div class="btn-row">'+
       (num?'<button class="btn primary" id="mWa">Send on WhatsApp</button>':'')+
       '<button class="btn" id="mPrint">Print all copies</button>'+
@@ -1086,6 +1236,94 @@ function savedModal(o){
   $("#mCopy").addEventListener("click", function(){ copyText(waText(o)); });
   $("#mDone").addEventListener("click", closeModal);
 }
+
+/* ============================================================
+   7c. EXPENSES
+   ============================================================ */
+var EXP_CATS = ["Supplies","Salary","Rent","Fuel / transport","Utilities","Maintenance","Machine / equipment","Government / licence","Other"];
+
+function staffNames(){
+  var seen={}, out=[];
+  DB.orders.forEach(function(o){ var n=shortWho(o.by); if(n && n!=="—" && !seen[n]){ seen[n]=1; out.push(n); } });
+  DB.expenses.forEach(function(e){ var n=e.spentBy||shortWho(e.by); if(n && !seen[n]){ seen[n]=1; out.push(n); } });
+  ["Shop"].forEach(function(n){ if(!seen[n]){ seen[n]=1; out.push(n); } });
+  return out.sort();
+}
+function monthExpenses(ym){ return DB.expenses.filter(function(e){ return monthOf(e.date)===ym; }); }
+function expTotals(list){
+  var t={total:0, cash:0, card:0, bank:0, other:0, cats:{}};
+  list.forEach(function(e){
+    var a=Number(e.amount)||0, k=modeKey(e.mode);
+    t.total=r2(t.total+a);
+    if(k==="Card") t.card=r2(t.card+a);
+    else if(k==="Bank transfer") t.bank=r2(t.bank+a);
+    else if(k==="Cash") t.cash=r2(t.cash+a);
+    else t.other=r2(t.other+a);
+    t.cats[e.cat||"Other"] = r2((t.cats[e.cat||"Other"]||0)+a);
+  });
+  return t;
+}
+function renderExpenses(){
+  var sel=$("#eFilterCat");
+  if(sel.options.length<2){
+    sel.innerHTML='<option value="">All categories</option>'+EXP_CATS.map(function(c){ return '<option>'+esc(c)+'</option>'; }).join("");
+  }
+  var names = staffNames();
+  $("#staffList").innerHTML = names.map(function(n){ return '<option value="'+esc(n)+'">'; }).join("");
+  var fb=$("#eFilterBy"), curB=fb.value;
+  fb.innerHTML = '<option value="">Everyone</option>'+names.map(function(n){ return '<option>'+esc(n)+'</option>'; }).join("");
+  fb.value = curB;
+  var ym=$("#eMonth").value || monthOf(todayISO());
+  $("#eMonth").value = ym;
+  var cf=sel.value, bf=fb.value;
+  var list = DB.expenses.filter(function(e){
+    if(monthOf(e.date)!==ym) return false;
+    if(cf && (e.cat||"Other")!==cf) return false;
+    if(bf && (e.spentBy||shortWho(e.by))!==bf) return false;
+    return true;
+  }).slice().sort(function(a,b){ return String(b.date).localeCompare(String(a.date)); });
+  var t=expTotals(list);
+  var perBy={};
+  list.forEach(function(e){ var k=e.spentBy||shortWho(e.by); perBy[k]=r2((perBy[k]||0)+(Number(e.amount)||0)); });
+  var byLine = Object.keys(perBy).sort(function(a,b){ return perBy[b]-perBy[a]; })
+    .map(function(k){ return k+" "+money(perBy[k]); }).join("  ·  ");
+  $("#expSummary").textContent = list.length+" entries · total AED "+money(t.total)+" ("+money(t.cash)+" cash)"+(byLine?" · "+byLine:"");
+  $("#expHint").textContent = "Only the owner records expenses. Staff bring their receipts and you enter them against their name.";
+  var box=$("#expList");
+  if(!list.length){ box.innerHTML='<div class="empty">No expenses for this month.</div>'; return; }
+  box.innerHTML = list.map(function(e){
+    return '<div class="rec"><div class="main">'+
+      '<div class="who">'+esc(e.cat||"Other")+'</div>'+
+      '<div class="meta">'+dmy(e.date)+' · '+esc(e.mode||"Cash")+' · spent by <b>'+esc(e.spentBy||shortWho(e.by))+'</b></div>'+
+      (e.note?'<div class="meta">'+esc(e.note)+'</div>':'')+
+      '<div class="acts"><button class="btn sm danger" data-edel="'+esc(e.id)+'">Delete</button></div>'+
+    '</div><div class="money"><b>'+money(e.amount)+'</b></div></div>';
+  }).join("");
+  $$("[data-edel]",box).forEach(function(b){
+    b.addEventListener("click", function(){
+      var e=DB.expenses.filter(function(x){ return x.id===b.dataset.edel; })[0]; if(!e) return;
+      if(!confirm("Delete this expense of AED "+money(e.amount)+"?")) return;
+      DB.expenses = DB.expenses.filter(function(x){ return x.id!==e.id; });
+      DB.expTomb.push({id:e.id, u:nowISO(), dirty:true});
+      save(); cloudPush(); renderExpenses(); refreshChrome(); toast("Expense deleted");
+    });
+  });
+}
+$("#btnAddExpense").addEventListener("click", function(){
+  var amt=Number($("#eAmount").value)||0;
+  if(amt<=0){ toast("Enter an amount"); $("#eAmount").focus(); return; }
+  var e={
+    id: uid(), date: $("#eDate").value||todayISO(), cat: $("#eCat").value,
+    amount: amt, mode: $("#eMode").value, note: $("#eNote").value.trim(),
+    spentBy: $("#eBy").value.trim() || "Shop",
+    by: whoAmI(), dev:(DB.settings.deviceCode||"").toUpperCase(),
+    _u: nowISO(), _dirty: true
+  };
+  DB.expenses.push(e); save(); cloudPush();
+  $("#eAmount").value=""; $("#eNote").value="";
+  renderExpenses(); refreshChrome(); toast("Expense saved");
+});
+["eMonth","eFilterCat","eFilterBy"].forEach(function(id){ $("#"+id).addEventListener("input", renderExpenses); });
 
 /* ============================================================
    8. ORDERS LIST
@@ -1114,7 +1352,7 @@ function renderOrders(){
     return '<div class="rec"><div class="main">'+
       '<div class="no">'+esc(o.no)+'</div>'+
       '<div class="who">'+esc(o.cust.name)+'</div>'+
-      '<div class="meta">'+dmy(o.date)+' · '+c.qty+' pcs · '+esc(o.cust.mobile||"no number")+(o.cust.area?" · "+esc(o.cust.area):"")+'</div>'+
+      '<div class="meta">'+dmy(o.date)+' · '+c.qty+' pcs · '+esc(mob(o.cust.mobile)||"no number")+(o.cust.area?" · "+esc(o.cust.area):"")+'</div>'+
       '<div class="acts">'+
         '<button class="btn sm" data-view-order="'+o.id+'">Details</button>'+
         '<button class="btn sm" data-print="'+o.id+'">Print</button>'+
@@ -1150,12 +1388,14 @@ document.addEventListener("keydown", function(e){ if(e.key==="Escape") closeModa
 
 function openOrder(id){
   var o=byId(id); if(!o) return; var c=calc(o);
-  var pays = (o.payments||[]).map(function(p){ return '<tr><td>'+dmy(p.date)+'</td><td>'+esc(p.mode)+'</td><td class="n">'+money(p.amount)+'</td></tr>'; }).join("");
+  var pays = (o.payments||[]).map(function(p){ return '<tr><td>'+dmy(p.date)+'</td><td>'+esc(p.mode)+'</td><td>'+esc(shortWho(p.by))+'</td><td class="n">'+money(p.amount)+'</td></tr>'; }).join("");
   var html =
     '<div class="rec" style="border:0;padding:0 0 10px"><div class="main">'+
       '<div class="no">'+esc(o.no)+'</div><div class="who">'+esc(o.cust.name)+'</div>'+
-      '<div class="meta">'+esc(o.cust.mobile)+' · '+esc(o.cust.area||"")+' '+esc(o.cust.building||"")+' '+esc(o.cust.flat||"")+'</div>'+
+      '<div class="meta">'+esc(mob(o.cust.mobile))+' · '+esc(o.cust.area||"")+' '+esc(o.cust.building||"")+' '+esc(o.cust.flat||"")+'</div>'+
       '<div class="meta">Booked '+dmy(o.date)+' · delivery '+dmy(o.delivery.date)+' '+hhmm12(o.delivery.time)+'</div>'+
+      '<div class="meta">Taken by <b>'+esc(shortWho(o.by))+'</b>'+((o.dev && String(o.by||"").indexOf(o.dev)<0)?' · device '+esc(o.dev):'')+
+        (o.editBy?' · last edited by '+esc(shortWho(o.editBy))+' '+dmy((o.editAt||"").slice(0,10)):'')+'</div>'+
     '</div></div>'+
     '<div class="scroll"><table class="data"><thead><tr><th>Qty</th><th>Item</th><th class="n">Rate</th><th class="n">Amount</th></tr></thead><tbody>'+
       o.lines.map(function(l){ return '<tr><td>'+l.qty+'</td><td>'+esc(l.name)+' <small>('+esc(TYPE_LABEL[l.type]||l.type)+')</small></td><td class="n">'+money(l.rate)+'</td><td class="n">'+money(l.qty*l.rate)+'</td></tr>'; }).join("")+
@@ -1167,9 +1407,15 @@ function openOrder(id){
       '<div class="trow"><span>VAT '+c.vatRate+'% (included)</span><span>'+money(c.vat)+'</span></div>'+
       '<div class="trow big"><span>Net amount</span><span>'+money(c.incl)+'</span></div>'+
       '<div class="trow"><span>Paid</span><span>'+money(c.paid)+'</span></div>'+
+      (function(){
+        var m=collections(o), out="";
+        MODES.forEach(function(k){ if(m[k]>0.009) out+='<div class="trow"><span style="padding-left:12px;color:var(--muted)">'+k+'</span><span>'+money(m[k])+'</span></div>'; });
+        if(m.Other>0.009) out+='<div class="trow"><span style="padding-left:12px;color:var(--muted)">Other</span><span>'+money(m.Other)+'</span></div>';
+        return out;
+      })()+
       '<div class="trow big"><span>Balance</span><span>'+money(c.balance)+'</span></div>'+
     '</div>'+
-    (pays?'<div class="scroll" style="margin-top:12px"><table class="data"><thead><tr><th>Payment date</th><th>Mode</th><th class="n">Amount</th></tr></thead><tbody>'+pays+'</tbody></table></div>':'')+
+    (pays?'<div class="scroll" style="margin-top:12px"><table class="data"><thead><tr><th>Payment date</th><th>Mode</th><th>Received by</th><th class="n">Amount</th></tr></thead><tbody>'+pays+'</tbody></table></div>':'')+
     (o.notes?'<p class="hint">Note: '+esc(o.notes)+'</p>':'')+
     '<div class="btn-row" style="margin-top:14px">'+
       '<button class="btn primary" data-m-print="'+o.id+'">Print all copies</button>'+
@@ -1179,7 +1425,7 @@ function openOrder(id){
       '<button class="btn" data-m-copy="'+o.id+'">Copy message</button>'+
       (c.balance>0.009?'<button class="btn dark" data-m-pay="'+o.id+'">Receive payment</button>':'')+
       '<button class="btn" data-m-edit="'+o.id+'">Edit</button>'+
-      '<button class="btn danger" data-m-del="'+o.id+'">Delete</button>'+
+      (isStaff()?'':'<button class="btn danger" data-m-del="'+o.id+'">Delete</button>')+
     '</div>';
   openModal("Order details", html);
   $("[data-m-print]").addEventListener("click",function(){ printOrder(o); });
@@ -1189,7 +1435,7 @@ function openOrder(id){
   $("[data-m-copy]").addEventListener("click",function(){ copyText(waText(o)); });
   var pb=$("[data-m-pay]"); if(pb) pb.addEventListener("click",function(){ payModal(o.id); });
   $("[data-m-edit]").addEventListener("click",function(){ editOrder(o.id); });
-  $("[data-m-del]").addEventListener("click",function(){
+  var db=$("[data-m-del]"); if(db) db.addEventListener("click",function(){
     if(!confirm("Delete order "+o.no+"? This cannot be undone.")) return;
     DB.orders = DB.orders.filter(function(x){ return x.id!==o.id; });
     DB.tomb.push({id:o.id, no:o.no, u:nowISO(), dirty:true});
@@ -1212,7 +1458,7 @@ function payModal(id){
     var amt=Number($("#payAmt").value)||0;
     if(amt<=0){ toast("Enter an amount"); return; }
     o.payments = o.payments||[];
-    o.payments.push({date:$("#payDate").value||todayISO(), amount:amt, mode:$("#payMode").value});
+    o.payments.push({date:$("#payDate").value||todayISO(), amount:amt, mode:$("#payMode").value, by:whoAmI()});
     touch(o); save(); cloudPush(); closeModal(); refreshChrome(); renderOrders(); renderCustomers(); toast("Payment recorded");
   });
 }
@@ -1242,7 +1488,7 @@ function renderCustomers(){
   box.innerHTML = list.map(function(c){
     return '<div class="rec"><div class="main">'+
       '<div class="who">'+esc(c.name)+'</div>'+
-      '<div class="meta">'+esc(c.mobile||"no number")+(c.area?" · "+esc(c.area):"")+'</div>'+
+      '<div class="meta">'+esc(mob(c.mobile)||"no number")+(c.area?" · "+esc(c.area):"")+'</div>'+
       '<div class="meta">'+c.orders.length+' orders · last '+dmy(c.last)+'</div>'+
       '<div class="acts"><button class="btn sm" data-cust="'+esc(c.key)+'">Order history</button></div>'+
     '</div><div class="money"><b>'+money(c.spent)+'</b>'+
@@ -1262,7 +1508,7 @@ function openCustomer(key){
       sp.map(function(x){ return '<tr><td>'+esc(x.name)+'</td><td>'+esc(TYPE_LABEL[x.type]||x.type)+'</td><td class="n"><b>'+money(x.rate)+'</b></td><td class="n">'+money(x.listed)+'</td></tr>'; }).join("")+
       '</tbody></table></div>' : "";
   openModal(c.name,
-    '<p class="hint" style="margin-top:0">'+esc(c.mobile||"")+(c.area?" · "+esc(c.area):"")+'</p>'+
+    '<p class="hint" style="margin-top:0">'+esc(mob(c.mobile))+(c.area?" · "+esc(c.area):"")+'</p>'+
     '<div class="kpis"><div class="kpi"><b>'+c.orders.length+'</b><span>Orders</span></div>'+
     '<div class="kpi"><b>'+money(c.spent)+'</b><span>Billed (AED)</span></div>'+
     '<div class="kpi '+(c.due>0.009?"due":"")+'"><b>'+money(c.due)+'</b><span>Pending (AED)</span></div>'+
@@ -1282,16 +1528,20 @@ function renderReports(){
   var list = monthOrders(ym);
   $("#rTitle").textContent = monthName(ym);
 
-  var t={orders:list.length, pcs:0, sub:0, urgent:0, disc:0, net:0, vat:0, paid:0, due:0, urgentCount:0};
+  var t={orders:list.length, pcs:0, sub:0, urgent:0, disc:0, net:0, vat:0, paid:0, due:0, urgentCount:0,
+         cash:0, card:0, bank:0, other:0};
   list.forEach(function(o){
-    var c=calc(o);
+    var c=calc(o), m=collections(o);
+    t.cash=r2(t.cash+m.Cash); t.card=r2(t.card+m.Card); t.bank=r2(t.bank+m["Bank transfer"]); t.other=r2(t.other+m.Other);
     t.pcs+=c.qty; t.sub+=c.sub; t.urgent+=c.urgent; t.disc+=c.disc;
     t.net+=c.incl; t.vat+=c.vat; t.paid+=c.paid; t.due+=c.balance;
     if(o.urgent) t.urgentCount++;
   });
   $("#rKpis").innerHTML =
     kpi(t.orders,"Orders","accent") + kpi(money(t.net),"Net sales (AED)","accent") +
-    kpi(money(t.paid),"Collected (AED)","") + kpi(money(t.due),"Pending (AED)","due") +
+    kpi(money(t.paid),"Collected total (AED)","") + kpi(money(t.due),"Pending (AED)","due") +
+    kpi(money(t.cash),"Cash (AED)","accent") + kpi(money(t.card),"Card (AED)","") +
+    kpi(money(t.bank),"Bank transfer (AED)","") + (t.other>0.009?kpi(money(t.other),"Other (AED)",""):"") +
     kpi(r2(t.pcs),"Pieces","") + kpi(money(t.vat),"VAT included (AED)","") +
     kpi(money(t.disc),"Discounts (AED)","") + kpi(money(t.urgent),"Urgent charges (AED)","");
 
@@ -1329,7 +1579,76 @@ function renderReports(){
     (months.length ? months.map(function(m){ return '<tr><td>'+monthName(m.k)+'</td><td class="n">'+m.orders+'</td><td class="n">'+money(m.net)+'</td><td class="n">'+money(m.paid)+'</td><td class="n">'+money(m.due)+'</td></tr>'; }).join("")
       : '<tr><td colspan="5">No records yet.</td></tr>')+'</tbody>';
 
-  window.__report = {ym:ym, t:t, items:items};
+  var exList = monthExpenses(ym), ex = expTotals(exList);
+  var profit = r2(t.net - ex.total);
+  $("#rKpis").innerHTML += kpi(money(ex.total),"Expenses (AED)","due") +
+    kpi(money(profit),"Profit (AED)","accent") +
+    kpi(money(r2(t.cash - ex.cash)),"Cash in hand (AED)","");
+  var pe=$("#panelExpenses");
+  if(pe){
+    pe.hidden = isStaff();
+    var cats = Object.keys(ex.cats).map(function(k){ return {k:k, v:ex.cats[k]}; }).sort(function(a,b){ return b.v-a.v; });
+    $("#rExp").innerHTML = '<thead><tr><th>Category</th><th class="n">Amount</th><th class="n">Share</th></tr></thead><tbody>'+
+      (cats.length ? cats.map(function(c){ return '<tr><td>'+esc(c.k)+'</td><td class="n">'+money(c.v)+'</td><td class="n">'+(ex.total?Math.round(c.v/ex.total*100):0)+'%</td></tr>'; }).join("")+
+        '<tr><td><b>Total</b></td><td class="n"><b>'+money(ex.total)+'</b></td><td class="n">'+money(ex.cash)+' cash</td></tr>'
+        : '<tr><td colspan="3">No expenses this month.</td></tr>')+'</tbody>';
+  }
+
+  var pes=$("#panelExpStaff");
+  if(pes){
+    pes.hidden = isStaff();
+    var pb={};
+    exList.forEach(function(e){
+      var k=e.spentBy||shortWho(e.by), a=Number(e.amount)||0;
+      if(!pb[k]) pb[k]={who:k, n:0, cash:0, total:0};
+      pb[k].n++; pb[k].total=r2(pb[k].total+a);
+      if(modeKey(e.mode)==="Cash") pb[k].cash=r2(pb[k].cash+a);
+    });
+    var pbr = Object.keys(pb).map(function(k){ return pb[k]; }).sort(function(a,b){ return b.total-a.total; });
+    $("#rExpStaff").innerHTML = '<thead><tr><th>Spent by</th><th class="n">Entries</th><th class="n">Cash</th><th class="n">Total</th></tr></thead><tbody>'+
+      (pbr.length ? pbr.map(function(x){ return '<tr><td>'+esc(x.who)+'</td><td class="n">'+x.n+'</td><td class="n">'+money(x.cash)+'</td><td class="n"><b>'+money(x.total)+'</b></td></tr>'; }).join("")+
+        '<tr><td><b>Total</b></td><td class="n">'+exList.length+'</td><td class="n"><b>'+money(ex.cash)+'</b></td><td class="n"><b>'+money(ex.total)+'</b></td></tr>'
+        : '<tr><td colspan="4">No expenses this month.</td></tr>')+'</tbody>';
+  }
+
+  // by staff
+  var by={};
+  function bucket(k){
+    if(!by[k]) by[k]={who:k, orders:0, billed:0, cash:0, card:0, bank:0, other:0, total:0};
+    return by[k];
+  }
+  function credit(who, mode, amt){
+    if(!(amt>0)) return;
+    var e=bucket(who), k=modeKey(mode);
+    if(k==="Card") e.card=r2(e.card+amt);
+    else if(k==="Bank transfer") e.bank=r2(e.bank+amt);
+    else if(k==="Cash") e.cash=r2(e.cash+amt);
+    else e.other=r2(e.other+amt);
+    e.total=r2(e.total+amt);
+  }
+  list.forEach(function(o){
+    var c=calc(o), k=shortWho(o.by);
+    var e=bucket(k); e.orders++; e.billed=r2(e.billed+c.incl);
+    credit(k, o.mode, Number(o.advance)||0);
+    (o.payments||[]).forEach(function(p){ credit(shortWho(p.by||o.by), p.mode, Number(p.amount)||0); });
+  });
+  exList.forEach(function(e){
+    var b=bucket(e.spentBy||shortWho(e.by)), a=Number(e.amount)||0;
+    if(modeKey(e.mode)==="Cash") b.spent=r2((b.spent||0)+a);
+    b.spentAll=r2((b.spentAll||0)+a);
+  });
+  var staffRows = Object.keys(by).map(function(k){ return by[k]; }).sort(function(a,b){ return b.total-a.total; });
+  var sp=$("#panelStaff");
+  if(sp){
+    sp.hidden = isStaff();
+    $("#rStaff").innerHTML = '<thead><tr><th>Staff</th><th class="n">Orders</th><th class="n">Cash in</th><th class="n">Card</th><th class="n">Bank</th><th class="n">Cash spent</th><th class="n">Cash in hand</th></tr></thead><tbody>'+
+      (staffRows.length ? staffRows.map(function(x){
+        return '<tr><td>'+esc(x.who)+'</td><td class="n">'+x.orders+
+          '</td><td class="n"><b>'+money(x.cash)+'</b></td><td class="n">'+money(x.card)+'</td><td class="n">'+money(x.bank)+
+          '</td><td class="n">'+money(x.spent||0)+'</td><td class="n"><b>'+money(r2(x.cash-(x.spent||0)))+'</b></td></tr>'; }).join("")
+        : '<tr><td colspan="7">No activity this month.</td></tr>')+'</tbody>';
+  }
+  window.__report = {ym:ym, t:t, items:items, ex:ex};
   function kpi(v,l,cls){ return '<div class="kpi '+cls+'"><b>'+v+'</b><span>'+l+'</span></div>'; }
 }
 $("#rMonth").addEventListener("change", renderReports);
@@ -1346,6 +1665,10 @@ $("#btnPrintReport").addEventListener("click", function(){
       line("Discounts", money(r.t.disc))+line("Net sales", money(r.t.net))+
       line("VAT included", money(r.t.vat))+line("Collected", money(r.t.paid))+
       line("Pending", money(r.t.due))+
+      line("Expenses", money(r.ex.total))+
+      line("  Cash expenses", money(r.ex.cash))+
+      line("Cash in hand", money(r2(r.t.cash - r.ex.cash)))+
+      line("Profit", money(r2(r.t.net - r.ex.total)))+
     '</div><div class="hr"></div>'+
     '<table><thead><tr><th>Item</th><th class="n">Qty</th><th class="n">Amount</th></tr></thead><tbody>'+
     r.items.slice(0,25).map(function(i){ return '<tr><td>'+esc(i.name)+'</td><td class="n">'+i.qty+'</td><td class="n">'+money(i.amt)+'</td></tr>'; }).join("")+
@@ -1429,6 +1752,7 @@ function fillSettings(){
   $("#sWeb").value=s.web; $("#sTrn").value=s.trn||""; $("#sVat").value=s.vat;
   $("#sUrgent").value=s.urgentPct; $("#sPrefix").value=s.prefix; $("#sNext").value=s.next;
   $("#sTerms").value=s.terms; $("#sFooter").value=s.footer;
+  applyRole();
   $("#sDevice").value=s.deviceCode||"";
   $("#sUser").value = CLOUD.user ? (CLOUD.user.email||"signed in") : (cloudConfigured()?"not signed in":"sync not configured");
   setSync(CLOUD.state);
@@ -1466,6 +1790,7 @@ $("#btnRemoveLogo").addEventListener("click", function(){ DB.settings.logo=RECEI
    14. BACKUP / EXPORT
    ============================================================ */
 function download(name, text, type){
+  if(isStaff()){ toast("Exporting is disabled on a staff device"); return; }
   var blob=new Blob([text],{type:type||"text/plain;charset=utf-8"});
   var url=URL.createObjectURL(blob), a=document.createElement("a");
   a.href=url; a.download=name; document.body.appendChild(a); a.click();
@@ -1493,13 +1818,14 @@ $("#restoreInput").addEventListener("change", function(e){
   rd.readAsText(f); e.target.value="";
 });
 function csvOf(orders){
-  var head=["Receipt","Date","Time","Delivery","Customer","Mobile","Area","Building","Flat","Pieces","Items","Urgent","Subtotal","UrgentCharge","Discount","BeforeVAT","VAT","NetAED","Paid","Balance","Status","Notes"];
+  var head=["Receipt","Date","Time","Delivery","Customer","Mobile","Area","Building","Flat","Pieces","Items","Urgent","Subtotal","UrgentCharge","Discount","BeforeVAT","VAT","NetAED","Paid","Cash","Card","BankTransfer","Balance","Status","Notes"];
   var rows=orders.map(function(o){
-    var c=calc(o);
+    var c=calc(o), mm=collections(o);
     var items=o.lines.map(function(l){ return l.qty+"x "+l.name+" ("+(TYPE_LABEL[l.type]||l.type)+")"; }).join("; ");
     return [o.no,o.date,o.time,o.delivery.date,o.cust.name,o.cust.mobile,o.cust.area,o.cust.building,o.cust.flat,
       c.qty,items,o.urgent?"Yes":"No",money(c.sub),money(c.urgent),money(c.disc),money(c.before),money(c.vat),
-      money(c.incl),money(c.paid),money(c.balance),c.balance<=0.009?"Paid":"Pending",o.notes||""];
+      money(c.incl),money(c.paid),money(mm.Cash),money(mm.Card),money(mm["Bank transfer"]),
+      money(c.balance),c.balance<=0.009?"Paid":"Pending",o.notes||""];
   });
   return [head].concat(rows).map(function(r){
     return r.map(function(v){ return '"'+String(v==null?"":v).replace(/"/g,'""')+'"'; }).join(",");
@@ -1522,7 +1848,7 @@ $("#btnWipe").addEventListener("click", function(){
 /* ============================================================
    14b. CLOUD SYNC (Supabase)
    ============================================================ */
-var LOCAL_ONLY_KEYS = ["next","deviceCode","copies","pad"];
+var LOCAL_ONLY_KEYS = ["next","deviceCode","copies","pad","role"];
 var CLOUD = {sb:null, user:null, state:"off", pushTimer:null, pulling:false};
 
 function cloudConfigured(){
@@ -1531,7 +1857,8 @@ function cloudConfigured(){
 }
 function pendingCount(){
   var n = DB.orders.filter(function(o){ return o._dirty; }).length +
-          DB.tomb.filter(function(t){ return t.dirty; }).length;
+          DB.tomb.filter(function(t){ return t.dirty; }).length +
+          DB.expenses.filter(function(e){ return e._dirty; }).length;
   if(DB.meta.sDirty) n++; if(DB.meta.iDirty) n++;
   return n;
 }
@@ -1572,6 +1899,7 @@ function rerender(){
   if(v.id==="view-customers") renderCustomers();
   if(v.id==="view-reports") renderReports();
   if(v.id==="view-prices") renderPrices();
+  if(v.id==="view-expenses") renderExpenses();
   if(v.id==="view-new") renderTotals();
 }
 
@@ -1613,6 +1941,7 @@ function cloudSubscribe(){
     CLOUD.sb.channel("wc-sync")
       .on("postgres_changes", {event:"*", schema:"public", table:"orders"}, function(){ cloudPull(); })
       .on("postgres_changes", {event:"*", schema:"public", table:"app_config"}, function(){ cloudPull(); })
+      .on("postgres_changes", {event:"*", schema:"public", table:"expenses"}, function(){ cloudPull(); })
       .subscribe();
   }catch(e){}
 }
@@ -1654,9 +1983,31 @@ function cloudPull(){
           }
         });
         DB.meta.lastPull = maxU;
-        save();
-        if(changed) rerender();
-        CLOUD.pulling=false; setSync("synced");
+        return CLOUD.sb.from("expenses").select("id,data,updated_at,deleted")
+          .gt("updated_at", DB.meta.lastPullE || "1970-01-01T00:00:00Z")
+          .then(function(ex){
+            if(ex.error){ CLOUD.expOk=false; return; }
+            CLOUD.expOk=true;
+            var maxE = DB.meta.lastPullE || "1970-01-01T00:00:00Z";
+            (ex.data||[]).forEach(function(r){
+              if(r.updated_at > maxE) maxE = r.updated_at;
+              var idx = DB.expenses.findIndex(function(e){ return e.id===r.id; });
+              var local = idx>-1 ? DB.expenses[idx] : null;
+              if(local && local._dirty) return;
+              if(r.deleted){ if(local){ DB.expenses.splice(idx,1); changed=true; } return; }
+              if(!r.data) return;
+              var obj=r.data; obj.id=r.id; obj._u=r.updated_at; obj._dirty=false;
+              if(!local){ DB.expenses.push(obj); changed=true; }
+              else if(r.updated_at > (local._u||"")){ DB.expenses[idx]=obj; changed=true; }
+            });
+            DB.meta.lastPullE = maxE;
+          })
+          .catch(function(){ CLOUD.expOk=false; })
+          .then(function(){
+            save();
+            if(changed) rerender();
+            CLOUD.pulling=false; setSync("synced");
+          });
       });
     })
     .catch(function(){ CLOUD.pulling=false; setSync("offline"); });
@@ -1676,8 +2027,16 @@ function cloudPushNow(){
   DB.tomb.filter(function(t){ return t.dirty; }).forEach(function(t){
     rows.push({id:t.id, no:t.no||"", data:{}, updated_at:t.u||nowISO(), deleted:true, device:dev});
   });
+  var exRows = DB.expenses.filter(function(e){ return e._dirty; }).map(function(e){
+    var d={}; Object.keys(e).forEach(function(k){ if(k!=="_dirty") d[k]=e[k]; });
+    return {id:e.id, data:d, updated_at:e._u||nowISO(), deleted:false, device:dev};
+  });
+  DB.expTomb.filter(function(t){ return t.dirty; }).forEach(function(t){
+    exRows.push({id:t.id, data:{}, updated_at:t.u||nowISO(), deleted:true, device:dev});
+  });
   var jobs=[];
   if(rows.length) jobs.push(CLOUD.sb.from("orders").upsert(rows, {onConflict:"id"}));
+  if(exRows.length && CLOUD.expOk!==false) jobs.push(CLOUD.sb.from("expenses").upsert(exRows, {onConflict:"id"}));
   if(DB.meta.sDirty) jobs.push(CLOUD.sb.from("app_config").upsert([{key:"settings", data:sharedSettings(), updated_at:DB.meta.sU||nowISO()}], {onConflict:"key"}));
   if(DB.meta.iDirty) jobs.push(CLOUD.sb.from("app_config").upsert([{key:"items", data:DB.items, updated_at:DB.meta.iU||nowISO()}], {onConflict:"key"}));
   if(!jobs.length){ setSync("synced"); return Promise.resolve(); }
@@ -1687,6 +2046,7 @@ function cloudPushNow(){
     if(bad.length){ setSync("error"); return; }
     DB.orders.forEach(function(o){ o._dirty=false; });
     DB.tomb = [];
+    if(CLOUD.expOk!==false){ DB.expenses.forEach(function(e){ e._dirty=false; }); DB.expTomb = []; }
     DB.meta.sDirty=false; DB.meta.iDirty=false;
     save(); setSync("synced");
   }).catch(function(){ setSync("offline"); });
@@ -1705,6 +2065,27 @@ $("#loginGo").addEventListener("click", function(){
 $("#loginSkip").addEventListener("click", function(){
   $("#login").hidden=true; setSync("signin");
   toast("Working offline. Sign in from Settings to sync.");
+});
+$("#btnRoleStaff").addEventListener("click", function(){
+  if(!DB.settings.pinHash){ toast("Set an owner PIN first, or you cannot unlock this device again"); return; }
+  if(!confirm("Lock this device as a staff device? Customer numbers will be hidden until the owner PIN is entered.")) return;
+  DB.settings.role="staff"; save(); applyRole(); fillDatalists(); rerender(); toast("Locked as staff device");
+});
+$("#btnRoleOwner").addEventListener("click", function(){
+  var pin = prompt("Enter the owner PIN");
+  if(pin===null) return;
+  sha(pin).then(function(h){
+    if(h!==DB.settings.pinHash){ toast("Wrong PIN"); return; }
+    DB.settings.role="owner"; save(); applyRole(); fillDatalists(); rerender(); toast("Owner mode unlocked");
+  });
+});
+$("#btnSetPin").addEventListener("click", function(){
+  var pin=$("#sPin").value.trim();
+  if(!/^[0-9]{4,8}$/.test(pin)){ toast("Use 4 to 8 digits"); return; }
+  sha(pin).then(function(h){
+    DB.settings.pinHash=h; saveS(); $("#sPin").value="";
+    toast("Owner PIN saved on all devices");
+  });
 });
 $("#btnSyncNow").addEventListener("click", function(){
   if(!cloudConfigured()){ toast("Add your Supabase details to config.js first"); return; }
@@ -1728,8 +2109,11 @@ function fillDatalists(){
     return '<option value="'+esc(it._label)+'">'+esc(rates)+'</option>';
   }).join("");
   $("#areaList").innerHTML = AREAS.map(function(a){ return '<option value="'+esc(a)+'">'; }).join("");
-  var mobs={}; DB.orders.forEach(function(o){ if(o.cust.mobile) mobs[o.cust.mobile]=o.cust.name; });
-  $("#mobileList").innerHTML = Object.keys(mobs).map(function(m){ return '<option value="'+esc(m)+'">'+esc(mobs[m])+'</option>'; }).join("");
+  if(isStaff()){ $("#mobileList").innerHTML=""; }
+  else {
+    var mobs={}; DB.orders.forEach(function(o){ if(o.cust.mobile) mobs[o.cust.mobile]=o.cust.name; });
+    $("#mobileList").innerHTML = Object.keys(mobs).map(function(m){ return '<option value="'+esc(m)+'">'+esc(mobs[m])+'</option>'; }).join("");
+  }
 }
 function refreshChrome(){
   var s=DB.settings;
@@ -1744,8 +2128,11 @@ function refreshChrome(){
 }
 if(!canPersist) showWarn();
 $("#fMonth").value = monthOf(todayISO());
+$("#eMonth").value = monthOf(todayISO());
+$("#eDate").value = todayISO();
 $("#rMonth").value = monthOf(todayISO());
 refreshChrome();
+applyRole();
 serviceOptions(null);
 resetForm();
 cloudInit();
