@@ -433,18 +433,6 @@ table.data td.n,table.data th.n{text-align:right;font-variant-numeric:tabular-nu
     </div>
 
     <div class="panel">
-      <div class="panel-hd"><h2>WhatsApp</h2><span class="sub">Used by the Send on WhatsApp button</span></div>
-      <div class="panel-bd">
-        <div class="grid g2 keep">
-          <label class="fld"><span>Country code</span><input type="text" id="sCC" placeholder="971"></label>
-          <label class="switch" style="align-self:end"><input type="checkbox" id="sWaPrices" checked> Include rates in the message</label>
-        </div>
-        <label class="fld" style="margin-top:10px"><span>Closing line</span><input type="text" id="sWaLine" placeholder="Free pickup and delivery across Dubai."></label>
-        <p class="hint">Local numbers like 0501234567 are converted to 971501234567 automatically.</p>
-      </div>
-    </div>
-
-    <div class="panel">
       <div class="panel-hd"><h2>Backup and data</h2></div>
       <div class="panel-bd">
         <div class="btn-row">
@@ -518,8 +506,7 @@ function defaultDB(){
       email:"support@washcare.ae", web:"Washcare.ae", trn:"",
       vat:5, urgentPct:100, prefix:"WC-", next:4528, pad:7,
       terms:DEFAULT_TERMS, footer:"Care for Your Clothes",
-      logo:RECEIPT_LOGO, copies:{office:true, customer:true, factory:true},
-      cc:"971", waPrices:true, waLine:"Free pickup and delivery across Dubai."
+      logo:RECEIPT_LOGO, copies:{office:true, customer:true, factory:true}
     },
     items: DEFAULT_ITEMS.slice(),
     orders: []
@@ -718,33 +705,6 @@ function buildKeymap(){
     it._label = label; KEYMAP[label.toLowerCase()] = it;
   });
 }
-function lastRate(mobile, itemName, type){
-  var key=digits(mobile); if(!key||!itemName) return null;
-  for(var i=DB.orders.length-1;i>=0;i--){
-    var o=DB.orders[i];
-    if(digits(o.cust.mobile)!==key) continue;
-    for(var j=o.lines.length-1;j>=0;j--){
-      var l=o.lines[j];
-      if(l.name===itemName && l.type===type) return {rate:Number(l.rate)||0, date:o.date, no:o.no};
-    }
-  }
-  return null;
-}
-function specialRates(mobile){
-  var key=digits(mobile), out={}, list=[];
-  if(!key) return list;
-  DB.orders.forEach(function(o){
-    if(digits(o.cust.mobile)!==key) return;
-    o.lines.forEach(function(l){
-      var it=DB.items.filter(function(x){ return x.n===l.name; })[0];
-      var listed = it && typeof it[l.type]==="number" ? it[l.type] : null;
-      if(listed===null) return;
-      if(Math.abs(listed-(Number(l.rate)||0))>0.009) out[l.name+"|"+l.type]={name:l.name,type:l.type,rate:Number(l.rate)||0,listed:listed,date:o.date};
-    });
-  });
-  Object.keys(out).forEach(function(k){ list.push(out[k]); });
-  return list;
-}
 function currentItem(){ return KEYMAP[$("#iName").value.trim().toLowerCase()] || null; }
 function serviceOptions(it){
   var sel=$("#iType"), keep=sel.value, avail=[];
@@ -755,31 +715,19 @@ function serviceOptions(it){
   }).join("");
   sel.value = avail.indexOf(keep)>-1 ? keep : avail[0];
 }
-function syncRate(useList){
+function syncRate(){
   var it=currentItem(); if(!it) return;
   var t=$("#iType").value;
-  var listRate = typeof it[t]==="number" ? it[t] : 0;
-  var hist = useList ? null : lastRate($("#cMobile").value, it.n, t);
-  var listLine = it.n+" · "+it.c+" · "+TYPE_ORDER.filter(function(x){ return typeof it[x]==="number"; })
+  $("#iRate").value = typeof it[t]==="number" ? it[t] : 0;
+  $("#itemHint").textContent = it.n+" · "+it.c+" · "+TYPE_ORDER.filter(function(x){ return typeof it[x]==="number"; })
     .map(function(x){ return TYPE_LABEL[x].toLowerCase()+" "+money(it[x]); }).join("  ·  ");
-  if(hist && Math.abs(hist.rate-listRate)>0.009){
-    $("#iRate").value = hist.rate;
-    $("#itemHint").innerHTML = '<b>Agreed rate for this customer: AED '+money(hist.rate)+'</b> '+
-      '(list '+money(listRate)+', last charged '+dmy(hist.date)+' on '+esc(hist.no)+') '+
-      '<button class="btn sm" id="btnUseList" type="button">Use list rate</button>';
-    var b=$("#btnUseList");
-    if(b) b.addEventListener("click", function(){ syncRate(true); });
-  }else{
-    $("#iRate").value = listRate;
-    $("#itemHint").textContent = listLine;
-  }
 }
 $("#iName").addEventListener("input", function(){
   var it=currentItem();
   if(it){ serviceOptions(it); syncRate(); }
   else{ $("#itemHint").textContent = $("#iName").value.trim() ? "Not in the price list — set the rate by hand." : ""; }
 });
-$("#iType").addEventListener("change", function(){ syncRate(); });
+$("#iType").addEventListener("change", syncRate);
 ["oUrgent","oDiscount","oAdvance"].forEach(function(id){ $("#"+id).addEventListener("input", renderTotals); });
 $("#cMobile").addEventListener("change", function(){
   var key=digits($("#cMobile").value); if(!key) return;
@@ -791,10 +739,7 @@ $("#cMobile").addEventListener("change", function(){
   if(!$("#cBuilding").value) $("#cBuilding").value = last.cust.building;
   if(!$("#cFlat").value) $("#cFlat").value = last.cust.flat;
   var due = prevDue(key, draft.editingId);
-  var sp = specialRates(key);
-  if($("#iName").value.trim()) syncRate();
-  $("#custHint").textContent = hits.length+" previous order(s)" + (due>0.009 ? " · outstanding AED "+money(due) : " · nothing pending")
-    + (sp.length ? " · "+sp.length+" agreed rate(s) on file" : "");
+  $("#custHint").textContent = hits.length+" previous order(s)" + (due>0.009 ? " · outstanding AED "+money(due) : " · nothing pending");
   renderTotals();
 });
 $("#btnResetOrder").addEventListener("click", function(){ resetForm(); toast("Form cleared"); });
@@ -815,12 +760,11 @@ function saveOrder(){
 }
 $("#btnSaveOnly").addEventListener("click", function(){
   var o=saveOrder(); if(!o) return;
-  resetForm(); savedModal(o);
+  toast("Order "+o.no+" saved"); resetForm();
 });
 $("#btnSavePrint").addEventListener("click", function(){
   var o=saveOrder(); if(!o) return;
   printOrder(o); resetForm();
-  setTimeout(function(){ savedModal(o); }, 900);
 });
 
 function editOrder(id){
@@ -937,95 +881,6 @@ function printOrder(o, only){
   setTimeout(function(){ window.print(); }, 120);
 }
 
-
-/* ============================================================
-   7b. WHATSAPP
-   ============================================================ */
-function waNumber(mobile){
-  var d = digits(mobile);
-  var cc = digits(DB.settings.cc) || "971";
-  if(!d) return "";
-  if(d.indexOf("00")===0) d = d.slice(2);
-  if(d.indexOf(cc)===0 && d.length > cc.length) return d;
-  if(d.charAt(0)==="0") d = d.slice(1);
-  if(d.length > 11) return d;
-  return cc + d;
-}
-function waText(o){
-  var s=DB.settings, c=calc(o), showRates = s.waPrices !== false;
-  var due = prevDue(o.cust.mobile, o.id);
-  var L=[];
-  L.push("*"+s.name+"*");
-  L.push("Tax invoice "+o.no);
-  L.push("");
-  if(o.cust.name) L.push("Customer: "+o.cust.name);
-  L.push("Booked: "+dmy(o.date));
-  L.push("Delivery: "+dmy(o.delivery.date)+(o.delivery.time?", "+hhmm12(o.delivery.time):""));
-  if(o.cust.area) L.push("Address: "+[o.cust.area,o.cust.building,o.cust.flat].filter(Boolean).join(", "));
-  L.push("");
-  L.push("*Items ("+c.qty+" pcs)*");
-  o.lines.forEach(function(l){
-    var label = l.qty+" x "+l.name+" - "+(TYPE_LABEL[l.type]||l.type).toLowerCase();
-    L.push(showRates ? label+": AED "+money(l.qty*l.rate) : label);
-  });
-  if(showRates){
-    L.push("");
-    L.push("Total: AED "+money(c.sub));
-    if(c.urgent>0) L.push("Fast service: AED "+money(c.urgent));
-    if(c.disc>0) L.push("Discount: AED "+money(c.disc));
-    L.push("Amount incl. VAT "+c.vatRate+"%: AED "+money(c.incl));
-    if(c.paid>0) L.push("Paid: AED "+money(c.paid));
-    if(due>0.009){
-      L.push("Previous dues: AED "+money(due));
-      L.push("*Balance due: AED "+money(due+c.balance)+"*");
-    }else{
-      L.push("*Balance due: AED "+money(c.balance)+"*");
-    }
-  }
-  if(o.notes) { L.push(""); L.push("Note: "+o.notes); }
-  L.push("");
-  if(s.waLine) L.push(s.waLine);
-  L.push([s.mobile, s.web].filter(Boolean).join(" | "));
-  L.push("Thank you for choosing "+(s.name.split(" ")[0])+".");
-  return L.join("\n");
-}
-function sendWhatsApp(o){
-  var num = waNumber(o.cust.mobile);
-  if(!num){ toast("No mobile number saved for this customer"); return; }
-  var url = "https://wa.me/"+num+"?text="+encodeURIComponent(waText(o));
-  var win = window.open(url, "_blank");
-  if(!win) location.href = url;
-}
-function copyText(txt){
-  if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(txt).then(function(){ toast("Message copied"); },function(){ fallback(); });
-  } else fallback();
-  function fallback(){
-    var ta=document.createElement("textarea");
-    ta.value=txt; ta.style.position="fixed"; ta.style.opacity="0";
-    document.body.appendChild(ta); ta.select();
-    try{ document.execCommand("copy"); toast("Message copied"); }catch(e){ toast("Copy not supported here"); }
-    ta.remove();
-  }
-}
-function savedModal(o){
-  var num = waNumber(o.cust.mobile);
-  openModal("Order "+o.no+" saved",
-    '<p class="hint" style="margin-top:0">'+esc(o.cust.name)+(num?" · WhatsApp +"+esc(num):" · no mobile number saved")+'</p>'+
-    '<div class="btn-row">'+
-      (num?'<button class="btn primary" id="mWa">Send on WhatsApp</button>':'')+
-      '<button class="btn" id="mPrint">Print all copies</button>'+
-      '<button class="btn" id="mCopy">Copy message</button>'+
-      '<button class="btn ghost" id="mDone">Done</button>'+
-    '</div>'+
-    '<p class="hint">WhatsApp opens with the message ready. Press send there.</p>'+
-    '<pre style="white-space:pre-wrap;font:inherit;font-size:13px;background:#f7fafc;border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:10px">'+esc(waText(o))+'</pre>');
-  var w=$("#mWa"); if(w) w.addEventListener("click", function(){ sendWhatsApp(o); });
-  $("#mPrint").addEventListener("click", function(){ printOrder(o); });
-  $("#mCopy").addEventListener("click", function(){ copyText(waText(o)); });
-  $("#mDone").addEventListener("click", closeModal);
-}
-
 /* ============================================================
    8. ORDERS LIST
    ============================================================ */
@@ -1057,7 +912,6 @@ function renderOrders(){
       '<div class="acts">'+
         '<button class="btn sm" data-view-order="'+o.id+'">Details</button>'+
         '<button class="btn sm" data-print="'+o.id+'">Print</button>'+
-        (o.cust.mobile?'<button class="btn sm" data-wa="'+o.id+'">WhatsApp</button>':'')+
         (paid?"":'<button class="btn sm primary" data-pay="'+o.id+'">Receive payment</button>')+
       '</div></div>'+
       '<div class="money"><b>'+money(c.incl)+'</b>'+
@@ -1071,7 +925,6 @@ function bindRowActions(box){
   $$("[data-view-order]",box).forEach(function(b){ b.addEventListener("click",function(){ openOrder(b.dataset.viewOrder); }); });
   $$("[data-print]",box).forEach(function(b){ b.addEventListener("click",function(){ var o=byId(b.dataset.print); if(o) printOrder(o); }); });
   $$("[data-pay]",box).forEach(function(b){ b.addEventListener("click",function(){ payModal(b.dataset.pay); }); });
-  $$("[data-wa]",box).forEach(function(b){ b.addEventListener("click",function(){ var o=byId(b.dataset.wa); if(o) sendWhatsApp(o); }); });
 }
 function byId(id){ return DB.orders.filter(function(o){ return o.id===id; })[0]; }
 ["fSearch","fMonth","fStatus"].forEach(function(id){ $("#"+id).addEventListener("input", renderOrders); });
@@ -1114,8 +967,6 @@ function openOrder(id){
       '<button class="btn primary" data-m-print="'+o.id+'">Print all copies</button>'+
       '<button class="btn" data-m-print1="'+o.id+'">Customer copy only</button>'+
       '<button class="btn" data-m-fact="'+o.id+'">Factory copy only</button>'+
-      (o.cust.mobile?'<button class="btn dark" data-m-wa="'+o.id+'">Send on WhatsApp</button>':'')+
-      '<button class="btn" data-m-copy="'+o.id+'">Copy message</button>'+
       (c.balance>0.009?'<button class="btn dark" data-m-pay="'+o.id+'">Receive payment</button>':'')+
       '<button class="btn" data-m-edit="'+o.id+'">Edit</button>'+
       '<button class="btn danger" data-m-del="'+o.id+'">Delete</button>'+
@@ -1124,8 +975,6 @@ function openOrder(id){
   $("[data-m-print]").addEventListener("click",function(){ printOrder(o); });
   $("[data-m-print1]").addEventListener("click",function(){ printOrder(o,"CUSTOMER"); });
   $("[data-m-fact]").addEventListener("click",function(){ printOrder(o,"FACTORY"); });
-  var wb=$("[data-m-wa]"); if(wb) wb.addEventListener("click",function(){ sendWhatsApp(o); });
-  $("[data-m-copy]").addEventListener("click",function(){ copyText(waText(o)); });
   var pb=$("[data-m-pay]"); if(pb) pb.addEventListener("click",function(){ payModal(o.id); });
   $("[data-m-edit]").addEventListener("click",function(){ editOrder(o.id); });
   $("[data-m-del]").addEventListener("click",function(){
@@ -1195,17 +1044,12 @@ function openCustomer(key){
     var k=calc(o);
     return '<tr><td>'+dmy(o.date)+'</td><td>'+esc(o.no)+'</td><td class="n">'+k.qty+'</td><td class="n">'+money(k.incl)+'</td><td class="n">'+money(k.balance)+'</td></tr>';
   }).join("");
-  var sp = specialRates(c.mobile);
-  var spHtml = sp.length ? '<div class="scroll" style="margin-top:12px"><table class="data"><thead><tr><th>Agreed rate</th><th>Service</th><th class="n">Their rate</th><th class="n">List</th></tr></thead><tbody>'+
-      sp.map(function(x){ return '<tr><td>'+esc(x.name)+'</td><td>'+esc(TYPE_LABEL[x.type]||x.type)+'</td><td class="n"><b>'+money(x.rate)+'</b></td><td class="n">'+money(x.listed)+'</td></tr>'; }).join("")+
-      '</tbody></table></div>' : "";
   openModal(c.name,
     '<p class="hint" style="margin-top:0">'+esc(c.mobile||"")+(c.area?" · "+esc(c.area):"")+'</p>'+
     '<div class="kpis"><div class="kpi"><b>'+c.orders.length+'</b><span>Orders</span></div>'+
     '<div class="kpi"><b>'+money(c.spent)+'</b><span>Billed (AED)</span></div>'+
     '<div class="kpi '+(c.due>0.009?"due":"")+'"><b>'+money(c.due)+'</b><span>Pending (AED)</span></div>'+
     '<div class="kpi"><b>'+dmy(c.last).slice(0,5)+'</b><span>Last order</span></div></div>'+
-    spHtml +
     '<div class="scroll" style="margin-top:12px"><table class="data"><thead><tr><th>Date</th><th>Receipt</th><th class="n">Pcs</th><th class="n">Net</th><th class="n">Balance</th></tr></thead><tbody>'+rows+'</tbody></table></div>');
 }
 $("#custSearch").addEventListener("input", renderCustomers);
@@ -1367,7 +1211,6 @@ function fillSettings(){
   $("#sWeb").value=s.web; $("#sTrn").value=s.trn||""; $("#sVat").value=s.vat;
   $("#sUrgent").value=s.urgentPct; $("#sPrefix").value=s.prefix; $("#sNext").value=s.next;
   $("#sTerms").value=s.terms; $("#sFooter").value=s.footer;
-  $("#sCC").value=s.cc||"971"; $("#sWaPrices").checked=s.waPrices!==false; $("#sWaLine").value=s.waLine||"";
   $("#cpOffice").checked=!!s.copies.office; $("#cpCustomer").checked=!!s.copies.customer; $("#cpFactory").checked=!!s.copies.factory;
   $("#logoPreview").innerHTML = s.logo ? '<img src="'+s.logo+'" alt="Current logo">' : '<span class="hint" style="padding:6px;text-align:center">No logo yet</span>';
 }
@@ -1378,7 +1221,6 @@ $("#btnSaveSettings").addEventListener("click", function(){
   s.vat=Number($("#sVat").value)||0; s.urgentPct=Number($("#sUrgent").value)||0;
   s.prefix=$("#sPrefix").value; s.next=Math.max(1, parseInt($("#sNext").value,10)||1);
   s.terms=$("#sTerms").value.trim(); s.footer=$("#sFooter").value.trim();
-  s.cc=digits($("#sCC").value)||"971"; s.waPrices=$("#sWaPrices").checked; s.waLine=$("#sWaLine").value.trim();
   save(); refreshChrome(); toast("Settings saved");
 });
 ["cpOffice","cpCustomer","cpFactory"].forEach(function(id){

@@ -8,8 +8,6 @@ A single-page laundry management app for Washcare Laundry Services, Dubai. Runs 
 - **80mm receipt printing** — three copies per order in one print job: **Office**, **Customer**, and **Factory** (the factory copy shows quantities and items only, never rates or totals).
 - **VAT handling** — rates are VAT-inclusive, matching the current printed bill. The receipt shows Amount Incl. VAT, Amount Before VAT and VAT 5% exactly as before.
 - **Payments and dues** — record part payments later, and every receipt shows the customer's previous outstanding plus the current balance.
-- **Send on WhatsApp** — one tap after saving an order opens WhatsApp with the customer's number and the full invoice already written out: items, quantities, totals, VAT, and the balance due. Also available on any past order from the Orders list. A **Copy message** button is there for when you want to paste it somewhere else.
-- **Contract rates remembered per customer** — when you charge a customer a rate that differs from the price list, the app remembers it. Next time you enter their number and pick that item, their agreed rate fills in automatically with a note showing the list rate and when it was last charged, plus a **Use list rate** button to override. Each customer's agreed rates are listed in their profile.
 - **Customers** — automatic customer index built from orders: order count, total billed, pending amount, full order history.
 - **Reports** — month-by-month sales, collected vs pending, VAT total, discounts, urgent charges, daily sales chart, item-wise sales, and a printable 80mm day/month report slip.
 - **Price list** — your full 176-item WashCare price list is built in, by category, with Dry clean / Wash & iron / Ironing rates. Rates auto-fill during order entry, and every rate is editable in the app.
@@ -42,12 +40,6 @@ Keep the repository **private** if you prefer — GitHub Pages on a private repo
 3. The official WashCare logo is already built in — a high-contrast version for thermal paper on receipts, and the full-colour version in the app header. Upload a different file only if you want to change it.
 4. Open **Price list** and check the rates. They come from `Washcare-Price_list.xlsx` exactly as supplied.
 5. Take a backup from **Settings → Download backup**.
-
-### WhatsApp
-
-Numbers are converted to international format automatically, so `0501234567`, `+971 50 123 4567` and `00971501234567` all work. The country code (default `971`) is in **Settings → WhatsApp**, along with a switch to hide rates from the message and the closing line. For a customer outside the UAE, type the number with its own country code.
-
-WhatsApp's link format carries text only, not files, so the message is the invoice written out in plain text rather than an image of the 80mm slip. On a phone it opens the WhatsApp app; on a desktop it opens WhatsApp Web.
 
 ### Fast service
 
